@@ -740,7 +740,7 @@ class Importer:
 			self.limit = previousLimit
 
 	def adjustMaterial(self, obj, mat):
-		if ((obj is not None) and (mat is not None):
+		if ((obj is not None) and (mat is not None)):
 			material = self.materials.get(mat.name)
 			if (material):
 				obj.ViewObject.ShapeMaterial.AmbientColor  = material.get('ambient', (0,0,0))
