@@ -13,8 +13,9 @@ import FreeCAD
 import re
 import Mesh
 import sys
+import numpy
 from struct  import unpack
-from math          import degrees
+from math    import degrees, sqrt, sin, cos
 
 INVALID_NAME = re.compile('^[0-9].*')
 
@@ -214,6 +215,46 @@ def createGroup(doc, name):
 		return newObject(doc, 'App::DocumentObjectGroup', name)
 	return None
 
+def _dotchain(first, *rest):
+    matrix = first
+    for next in rest:
+        matrix = numpy.dot(matrix, next)
+    return matrix
+
+def createKeyMatrix(pvt, scl, rot, pos):
+	pvtMtx = numpy.identity(4, numpy.float32)
+	if (pvt is not None):
+		pvtMtx[0,3] = -pvt[0]
+		pvtMtx[1,3] = -pvt[2]
+		pvtMtx[2,3] = -pvt[1]
+	sclMtx = numpy.identity(4,numpy.float32)
+	if scl is not None:
+		sclMtx[0,0] = 1.0 / scl[0]
+		sclMtx[1,1] = 1.0 / scl[2]
+		sclMtx[2,2] = 1.0 / scl[1]
+	rotMtx = numpy.identity(4,numpy.float32)
+	if rot is not None:
+		angle = rot[0]
+		axisx = rot[1][0]
+		axisy = rot[1][2]
+		axisz = rot[1][1]
+		if abs(angle) > 0.0001:
+			v = numpy.array((axisx, axisy, axisz), numpy.float32)
+			u = v / sqrt(numpy.dot(v,v))
+			s = numpy.array(((0,-u[2],u[1]),
+							 (u[2],0,-u[0]),
+							 (-u[1],u[0],0)), numpy.float32)
+			p = numpy.outer(u, u)
+			i = numpy.identity(3, numpy.float32)
+			m = p + cos(angle)*(i-p) + sin(angle)*s
+			rotMtx[0:3, 0:3] = m
+	posMtx = numpy.identity(4, numpy.float32)
+	if pos is not None:
+		posMtx[0,3] = -pos[0]
+		posMtx[1,3] = -pos[2]
+		posMtx[2,3] = -pos[1]
+	return _dotchain(pvtMtx, sclMtx, rotMtx, posMtx)
+
 class AbstractChunk():
 	def __init__(self, id, len):
 		self.id          = id
@@ -247,14 +288,46 @@ class PlacementChunk(AbstractChunk):
 		u = self.data[0]
 		v = self.data[1]
 		n = self.data[2]
-		t = self.data[3]
-		return "%s: (%g,%g,%g),(%g,%g,%g),(%g,%g,%g),(%g,%g,%g)" % (getChunkName(self), u[0], u[1], u[2], v[0], v[1], v[2], n[0], n[1], n[2], t[0], t[1], t[2])
+		return "%s: (%g,%g,%g,%g),(%g,%g,%g,%g),(%g,%g,%g,%g)" % (getChunkName(self) \
+			, self.data[0], self.data[1], self.data[2], self.data[3] \
+			, self.data[4], self.data[5], self.data[6], self.data[7] \
+			, self.data[8], self.data[9], self.data[10], self.data[11])
 	def loadData(self, chopper):
-		u = chopper.getPoint()
-		v = chopper.getPoint()
-		n = chopper.getPoint()
-		t = chopper.getPoint()
-		self.data = [u, v, n, t]
+		# a11 =  0.9625
+		# a21 =  1.78814e-07
+		# a31 =  0.271281
+		# a12 = -0.0001426
+		# a22 = 1
+		# a32 =  0.0005058
+		# a13 = -0.271281
+		# a23 = -0.0005254
+		# a33 = 0.9625
+		# a14 = -2.58789 
+		# a24 = 16.5187
+		# a34 = 9.18042
+		#
+		#    0.9625  -0.0001426     -0.2713      -2.588
+		#    0.2713   0.0005058      0.9625        9.18
+		# 1.788e-07           1  -0.0005254       16.52
+		a11 = chopper.getFloat()
+		a21 = chopper.getFloat()
+		a31 = chopper.getFloat()
+		a12 = chopper.getFloat()
+		a22 = chopper.getFloat()
+		a32 = chopper.getFloat()
+		a13 = chopper.getFloat()
+		a23 = chopper.getFloat()
+		a33 = chopper.getFloat()
+		a14 = chopper.getFloat()
+		a24 = chopper.getFloat()
+		a34 = chopper.getFloat()
+		self.data = (a11, a12, a13, a14, a21, a22, a23, a24, a31, a32, a33, a34)
+	def getMatrix(self):
+		return numpy.array([ \
+			[self.data[0x0], self.data[0x1], self.data[0x2], self.data[0x3]], \
+			[self.data[0x4], self.data[0x5], self.data[0x6], self.data[0x7]], \
+			[self.data[0x8], self.data[0x9], self.data[0xA], self.data[0xB]], \
+			[0, 0, 0, 1]], numpy.float32)
 
 class BooleanChunk(AbstractChunk):
 	def __init__(self, id, len): AbstractChunk.__init__(self, id, len)
@@ -319,6 +392,7 @@ class HierarchyChunk(AbstractChunk):
 		flag2     = chopper.getUnsignedShort()
 		parentId  = chopper.getShort()
 		self.data = (flag1, flag2, parentId)
+	def getParentId(self): return self.data[2]
 
 class HierarchyInfoChunk(AbstractChunk):
 	def __init__(self, id, len): AbstractChunk.__init__(self, id, len)
@@ -377,6 +451,13 @@ class MeshInfoChunk(AbstractChunk):
 	def initialize(self, chopper):
 		hi = self.getSubChunk(HIERARCHY_INFO) # build up tree!
 		hrx = self.getSubChunk(HIERARCHY)
+		pvt = getData(self, PIVOTS)
+		pos = getData(self, TRACK)[0][2]
+		rot = getData(self, ROTATION)[0]
+		scl = getData(self, TRACK_SCALE)[0][2]
+		mtx = createKeyMatrix(pvt, scl, rot, pos)
+		self.matrix = mtx
+		chopper.keyMatrix[hi.data] = self
 		nObj = chopper.namedObjectes.get(hrx.name)
 		if (nObj):
 			mObj = nObj.getSubChunk(TRI_MESH_OBJ)
@@ -387,17 +468,31 @@ class MeshInfoChunk(AbstractChunk):
 
 				if (dsc):
 					mat = dsc.getSubChunk(TRI_MATERIAL)
-					pvt = getData(self, PIVOTS)
-					trk = getData(self, TRACK)[0][2]
-					rot = getData(self, ROTATION)[0]
-					scl = getData(self, TRACK_SCALE)[0][2]
+					parent = chopper.keyMatrix.get(hrx.getParentId())
+					while (parent is not None):
+						prnMtx = parent.matrix
+						if (prnMtx is not None):
+							mtx = mtx.dot(prnMtx)
+						hrx = parent.getSubChunk(HIERARCHY)
+						if ((hrx is not None) and (hrx.getParentId() > -1)):
+							parent = chopper.keyMatrix.get(hrx.getParentId())
+						else:
+							parent = None
+					plc = mObj.getSubChunk(TRI_PLACEMENT) # the 3D object faces              => PlacementChunk
+					mshMtx = plc.getMatrix()
+					mtx = numpy.dot(mshMtx, mtx)
+					mtx = FreeCAD.Matrix( \
+							mtx[0][0], mtx[0][1], mtx[0][2], mtx[0][3], \
+							mtx[1][0], mtx[1][1], mtx[1][2], mtx[1][3], \
+							mtx[2][0], mtx[2][1], mtx[2][2], mtx[2][3], \
+							mtx[3][0], mtx[3][1], mtx[3][2], mtx[3][3], )
 					data = []
 					for idx in dsc.data:
 						data.append([pts[idx[0]], pts[idx[1]], pts[idx[2]]])
+					msh = Mesh.Mesh(data)
+					msh.transform(mtx) # FIXME: doesn't work properly!
 					obj = newObject(chopper.tg, "Mesh::Feature", hrx.name)
 					obj.ViewObject.Lighting = "Two side"
-					# TODO - fix rotation, scale and location and pivot
-					msh = Mesh.Mesh(data)
 					obj.Mesh = msh
 					chopper.adjustMaterial(obj, mat)
 
@@ -655,6 +750,7 @@ class Importer:
 		self.currentGroup = doc
 		self.materials = {}
 		self.namedObjectes = {}
+		self.keyMatrix = {}
 
 	def close(self): self.file.close()
 
