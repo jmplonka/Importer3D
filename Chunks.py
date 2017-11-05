@@ -59,7 +59,7 @@ MAT_TRANSPARENCY_PERCENTAGE         = 0xA050
 MAT_TRANSPARENCY_FALLOFF_PERCENTAGE = 0xA052
 MAT_REFLECTION_BLUR_PERCENTAGE      = 0xA053
 TWO_SIDED                           = 0xA081
-MAT_SELF_ILLUM                      = 0xA084
+MAT_SELF_ILLUM_PERCENTAGE           = 0xA084
 MAT_WIRESIZE                        = 0xA087
 MAT_XPFALLIN                        = 0xA08A
 MAT_PHONGSOFT                       = 0xA08C
@@ -133,14 +133,14 @@ DESC_MAP = { \
 	MAT_PHONGSOFT                       : 'Material Phong soft', \
 	MAT_REFLECTION_BLUR_PERCENTAGE      : 'Material Reflection', \
 	MAT_REFLECTION_MAP                  : 'Material Reflection Map', \
-	MAT_SELF_ILLUM                      : 'Self illumination', \
-	MAT_SELF_ILLUM_MAP                  : 'Material Self illumination Map', \
-	MAT_SHININESS_MAP                   : 'Material Shininess Map', \
+	MAT_SELF_ILLUM_PERCENTAGE           : 'Material Emissive', \
+	MAT_SELF_ILLUM_MAP                  : 'Material Emissive Map', \
 	MAT_SHININESS_PERCENT               : 'Material Shininess', \
 	MAT_SHININESS_STRENGTH_PERCENT      : 'Material Shininess strength', \
+	MAT_SHININESS_MAP                   : 'Material Shininess Map', \
 	MAT_SPECULAR_COLOR                  : 'Material Specular Color', \
 	MAT_TEXTURE_BLUR_MAP                : 'Material Texture Blur Map', \
-	MAT_TEXTURE_NAME                    : 'Material Texture Name', \
+	MAT_TEXTURE_NAME                    : 'Material Texture', \
 	MAT_TRANSPARENCY_FALLOFF_PERCENTAGE : 'Material Transparency falloff', \
 	MAT_TRANSPARENCY_PERCENTAGE         : 'Material Transparency', \
 	MAT_WIRESIZE                        : 'Material Wire Size', \
@@ -221,23 +221,27 @@ def _dotchain(first, *rest):
         matrix = numpy.dot(matrix, next)
     return matrix
 
-def createKeyMatrix(pvt, scl, rot, pos):
+def createKeyMatrix(track):
+	pvt = getData(track, PIVOTS)
+	scl = getData(track, TRACK_SCALE)[0][2]
+	rot = getData(track, ROTATION)[0]
+	pos = getData(track, TRACK)[0][2]
 	pvtMtx = numpy.identity(4, numpy.float32)
 	if (pvt is not None):
 		pvtMtx[0,3] = -pvt[0]
-		pvtMtx[1,3] = -pvt[2]
-		pvtMtx[2,3] = -pvt[1]
+		pvtMtx[1,3] = -pvt[1]
+		pvtMtx[2,3] = -pvt[2]
 	sclMtx = numpy.identity(4,numpy.float32)
 	if scl is not None:
 		sclMtx[0,0] = 1.0 / scl[0]
-		sclMtx[1,1] = 1.0 / scl[2]
-		sclMtx[2,2] = 1.0 / scl[1]
+		sclMtx[1,1] = 1.0 / scl[1]
+		sclMtx[2,2] = 1.0 / scl[2]
 	rotMtx = numpy.identity(4,numpy.float32)
 	if rot is not None:
 		angle = rot[0]
 		axisx = rot[1][0]
-		axisy = rot[1][2]
-		axisz = rot[1][1]
+		axisy = rot[1][1]
+		axisz = rot[1][2]
 		if abs(angle) > 0.0001:
 			v = numpy.array((axisx, axisy, axisz), numpy.float32)
 			u = v / sqrt(numpy.dot(v,v))
@@ -251,9 +255,12 @@ def createKeyMatrix(pvt, scl, rot, pos):
 	posMtx = numpy.identity(4, numpy.float32)
 	if pos is not None:
 		posMtx[0,3] = -pos[0]
-		posMtx[1,3] = -pos[2]
-		posMtx[2,3] = -pos[1]
+		posMtx[1,3] = -pos[1]
+		posMtx[2,3] = -pos[2]
 	return _dotchain(pvtMtx, sclMtx, rotMtx, posMtx)
+
+def adjustPoint(pts, idx, mtx):
+	return []
 
 class AbstractChunk():
 	def __init__(self, id, len):
@@ -289,26 +296,10 @@ class PlacementChunk(AbstractChunk):
 		v = self.data[1]
 		n = self.data[2]
 		return "%s: (%g,%g,%g,%g),(%g,%g,%g,%g),(%g,%g,%g,%g)" % (getChunkName(self) \
-			, self.data[0], self.data[1], self.data[2], self.data[3] \
-			, self.data[4], self.data[5], self.data[6], self.data[7] \
-			, self.data[8], self.data[9], self.data[10], self.data[11])
+			, self.data[0x0], self.data[0x1], self.data[0x2], self.data[0x3] \
+			, self.data[0x4], self.data[0x5], self.data[0x6], self.data[0x7] \
+			, self.data[0x8], self.data[0x9], self.data[0xA], self.data[0xB])
 	def loadData(self, chopper):
-		# a11 =  0.9625
-		# a21 =  1.78814e-07
-		# a31 =  0.271281
-		# a12 = -0.0001426
-		# a22 = 1
-		# a32 =  0.0005058
-		# a13 = -0.271281
-		# a23 = -0.0005254
-		# a33 = 0.9625
-		# a14 = -2.58789 
-		# a24 = 16.5187
-		# a34 = 9.18042
-		#
-		#    0.9625  -0.0001426     -0.2713      -2.588
-		#    0.2713   0.0005058      0.9625        9.18
-		# 1.788e-07           1  -0.0005254       16.52
 		a11 = chopper.getFloat()
 		a21 = chopper.getFloat()
 		a31 = chopper.getFloat()
@@ -425,13 +416,15 @@ class MaterialChunk(AbstractChunk):
 		diffuse = getData(self, MAT_DIFFUSE_COLOR)
 		specular = getData(self, MAT_SPECULAR_COLOR)
 		shinines = getData(self, MAT_SHININESS_PERCENT)
+		emissive = getData(self, MAT_SELF_ILLUM_PERCENTAGE)
 		transparency = getData(self, MAT_TRANSPARENCY_PERCENTAGE)
 		self.data = {}
 		if (ambient): self.data['ambient'] = ambient
 		if (diffuse): self.data['diffuse'] = diffuse
 		if (specular): self.data['specular'] = specular
 		if (shinines): self.data['shinines'] = shinines
-		if (transparency): self.data['transparency'] = transparency
+		if (emissive): self.data['emissive'] = emissive
+	if (transparency): self.data['transparency'] = transparency
 		chopper.materials[self.name] = self.data
 
 class MeshAnimChunk(AbstractChunk):
@@ -451,11 +444,7 @@ class MeshInfoChunk(AbstractChunk):
 	def initialize(self, chopper):
 		hi = self.getSubChunk(HIERARCHY_INFO) # build up tree!
 		hrx = self.getSubChunk(HIERARCHY)
-		pvt = getData(self, PIVOTS)
-		pos = getData(self, TRACK)[0][2]
-		rot = getData(self, ROTATION)[0]
-		scl = getData(self, TRACK_SCALE)[0][2]
-		mtx = createKeyMatrix(pvt, scl, rot, pos)
+		mtx = createKeyMatrix(self)
 		self.matrix = mtx
 		chopper.keyMatrix[hi.data] = self
 		nObj = chopper.namedObjectes.get(hrx.name)
@@ -463,9 +452,7 @@ class MeshInfoChunk(AbstractChunk):
 			mObj = nObj.getSubChunk(TRI_MESH_OBJ)
 			if (mObj):
 				pts = getData(mObj, TRI_VERTEXL)          # the 3D-point coordinates         => Vertex3ListChunk
-				tex = getData(mObj, TRI_MAPPINGCOORS)     # the texture 2D-point coordinates => Vertex2ListChunk
 				dsc = mObj.getSubChunk(FACES_DESCRIPTION) # the 3D object faces              => FacesDescriptionChunk
-
 				if (dsc):
 					mat = dsc.getSubChunk(TRI_MATERIAL)
 					parent = chopper.keyMatrix.get(hrx.getParentId())
@@ -478,22 +465,26 @@ class MeshInfoChunk(AbstractChunk):
 							parent = chopper.keyMatrix.get(hrx.getParentId())
 						else:
 							parent = None
+
 					plc = mObj.getSubChunk(TRI_PLACEMENT) # the 3D object faces              => PlacementChunk
 					mshMtx = plc.getMatrix()
 					mtx = numpy.dot(mshMtx, mtx)
+
+					data = []
+					for idx in dsc.data:
+						data.append([pts[idx[0]], pts[idx[1]], pts[idx[2]]])
+					msh = Mesh.Mesh(data)
+
 					mtx = FreeCAD.Matrix( \
 							mtx[0][0], mtx[0][1], mtx[0][2], mtx[0][3], \
 							mtx[1][0], mtx[1][1], mtx[1][2], mtx[1][3], \
 							mtx[2][0], mtx[2][1], mtx[2][2], mtx[2][3], \
 							mtx[3][0], mtx[3][1], mtx[3][2], mtx[3][3], )
-					data = []
-					for idx in dsc.data:
-						data.append([pts[idx[0]], pts[idx[1]], pts[idx[2]]])
-					msh = Mesh.Mesh(data)
-					msh.transform(mtx) # FIXME: doesn't work properly!
+
 					obj = newObject(chopper.tg, "Mesh::Feature", hrx.name)
 					obj.ViewObject.Lighting = "Two side"
 					obj.Mesh = msh
+					obj.Placement = FreeCAD.Placement(mtx)
 					chopper.adjustMaterial(obj, mat)
 
 class NamedObjectChunk(AbstractChunk):
@@ -711,6 +702,7 @@ class Importer:
 		self.constructors[MAT_TEXTURE_NAME] = StringChunk
 		self.constructors[MAT_TRANSPARENCY_FALLOFF_PERCENTAGE] = PercentageChunk
 		self.constructors[MAT_TRANSPARENCY_PERCENTAGE] = PercentageChunk
+		self.constructors[MAT_SELF_ILLUM_PERCENTAGE] = PercentageChunk
 		self.constructors[MAT_WIRESIZE] = FloatChunk
 		self.constructors[MESH_ANIM] = MeshAnimChunk
 		self.constructors[MESH_INFO] = MeshInfoChunk
@@ -768,8 +760,8 @@ class Importer:
 		return [x, y]
 	def getPoint(self):
 		x = self.getFloat()
-		z = self.getFloat()
 		y = self.getFloat()
+		z = self.getFloat()
 		return [x, y, z]
 	def getString(self):
 		start = self.file.tell()
@@ -820,7 +812,7 @@ class Importer:
 					parentChunk.addSubChunk(chunkId, chunk)
 					chunk.loadData(self)
 					self.pushData(chunkId, chunk.data)
-					FreeCAD.Console.PrintMessage("%sadded %s\n" %((level + 1) * '  ', chunk))
+					#FreeCAD.Console.PrintMessage("%sadded %s\n" %((level + 1) * '  ', chunk))
 					try:
 						if (self.hasRemaining()):
 							self.loadSubChunks(chunk, chunkLen, level + 1)
@@ -841,7 +833,7 @@ class Importer:
 			if (material):
 				obj.ViewObject.ShapeMaterial.AmbientColor  = material.get('ambient', (0,0,0))
 				obj.ViewObject.ShapeMaterial.DiffuseColor  = material.get('diffuse', (0.8,0.8,0.8))
-#				obj.ViewObject.ShapeMaterial.EmissiveColor = material.get('emissive', (0,0,0))
+				obj.ViewObject.ShapeMaterial.EmissiveColor = material.get('emissive', (0,0,0))
 				obj.ViewObject.ShapeMaterial.SpecularColor = material.get('specular', (0,0,0))
 				obj.ViewObject.ShapeMaterial.Shininess     = material.get('shinines', 0.2)
 				obj.ViewObject.ShapeMaterial.Transparency  = material.get('transparency', 0.0)
