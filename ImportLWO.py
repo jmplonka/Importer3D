@@ -4,30 +4,7 @@ __title__="FreeCAD Autodesk 3DS Max importer"
 __author__ = "Jens M. Plonka"
 __url__ = "https://www.github.com/jmplonka/Importer3D"
 
-import os
-import FreeCAD
-import Chunks
-
-def decode(name):
-	"decodes encoded strings"
-	try:
-		decodedName = (name.decode("utf8"))
-	except UnicodeDecodeError:
-		try:
-			decodedName = (name.decode("latin1"))
-		except UnicodeDecodeError:
-			FreeCAD.Console.PrintError("Error: Couldn't determine character encoding")
-			decodedName = name
-	return decodedName
-
 def read(doc, filename):
-	reader = Chunks.Importer(doc, filename)
-	chunkId = reader.getChunkId2()
-	chunkLen = reader.getChunkLen4() - 6
-	if (chunkId == Chunks.MAIN):
-		chunk = reader.createChunk(chunkId, chunkLen)
-		reader.loadSubChunks(chunk, chunkLen)
-	reader.close()
 	return
 
 def insert(filename, docname):

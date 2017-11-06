@@ -1,11 +1,12 @@
 # -*- coding: utf8 -*-
 
+__title__="FreeCAD Autodesk 3DS Max importer"
+__author__ = "Jens M. Plonka"
+__url__ = "https://www.github.com/jmplonka/Importer3D"
+
 '''
 ref. http://paulbourke.net/dataformats/3ds/
 '''
-__title__="FreeCAD Autodesk 3DS Max importer"
-__author__ = "Jens M. Plonka"
-__url__ = "https:#www.github.com/jmplonka/Import3DS"
 
 import os
 import traceback
