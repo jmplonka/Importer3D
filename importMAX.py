@@ -5,7 +5,7 @@ __author__ = "Jens M. Plonka"
 __url__    = "https://www.github.com/jmplonka/Importer3D"
 
 import FreeCAD, triangulate, numpy, zlib, sys, traceback
-from importUtils import missingDependency, canImport, newObject, getShort, getInts, getInt, getLong, getFloats, getFloat
+from importUtils import missingDependency, canImport, newObject, getByte, getShorts, getShort, getInts, getInt, getLong, getFloats, getFloat
 from math        import degrees
 
 try:
@@ -39,8 +39,8 @@ class AbstractChunk():
 		self.resolved = False
 	def __str__(self):
 		if (self.unknown == True):
-			return "%s[%4d] %04X: %s" %("  "*self.level, self.number, self.type, ":".join("%02x"%(ord(c)) for c in self.data))
-		return "%s[%4d] %04X: %s=%s" %("  "*self.level, self.number, self.type, self.format, self.data)
+			return "%s[%4x] %04X: %s" %("  "*self.level, self.number, self.type, ":".join("%02x"%(ord(c)) for c in self.data))
+		return "%s[%4x] %04X: %s=%s" %("  "*self.level, self.number, self.type, self.format, self.data)
 
 class ByteArrayChunk(AbstractChunk):
 	def __init__(self, type, data, level, number): AbstractChunk.__init__(self, type, data, level, number)
@@ -72,7 +72,7 @@ class ByteArrayChunk(AbstractChunk):
 		elif (self.type == 0x0456): self.setStr16(data)
 		elif (self.type == 0x0962): self.setStr16(data)
 		elif (self.type == 0x2034): self.set(data, "int[]", '<' + 'I'*(len(data)/4), 0, len(data))
-		elif (self.type == 0x2035): self.set(data, "int[]", '<' + 'I'*(len(data)/4), 0, len(data))
+		elif (self.type == 0x2035): self.set(data, "int{}", '<' + 'I'*(len(data)/4), 0, len(data))
 		elif (self.type == 0x2501): self.set(data, "float[]", '<' + 'f'*(len(data)/4), 0, len(data))
 		elif (self.type == 0x2503): self.set(data, "float[]", '<' + 'f'*(len(data)/4), 0, len(data))
 		elif (self.type == 0x2504): self.set(data, "float[]", '<' + 'f'*(len(data)/4), 0, len(data))
@@ -128,8 +128,8 @@ class ContainerChunk(AbstractChunk):
 		self.primitiveReader = primitiveReader
 	def __str__(self):
 		if (self.unknown == True):
-			return "%s[%4d] %04X" %("  "*self.level, self.number, self.type)
-		return "%s[%4d] %04X: %s" %("  "*self.level, self.number, self.type, self.format)
+			return "%s[%4x] %04X" %("  "*self.level, self.number, self.type)
+		return "%s[%4x] %04X: %s" %("  "*self.level, self.number, self.type, self.format)
 	def getFirst(self, type):
 		for child in self.children:
 			if (child.type == type): return child
@@ -148,8 +148,8 @@ class SceneChunk(ContainerChunk):
 		self.matrix = None
 	def __str__(self):
 		if (self.unknown == True):
-			return "%s[%4d] %s" %("  "*self.level, self.number, getClsName(self))
-		return "%s[%4d] %s: %s" %("  "*self.level, self.number, getClsName(self), self.format)
+			return "%s[%4x] %s" %("  "*self.level, self.number, getClsName(self))
+		return "%s[%4x] %s: %s" %("  "*self.level, self.number, getClsName(self), self.format)
 	def setData(self, data):
 		previous       = None
 		next           = None
@@ -213,6 +213,16 @@ class PointNi3s():
 		self.fA     = []
 	def __str__(self):
 		return "[%s] - %X, %X, %X, [%s]" %('/'.join("%d" %p for p in self.points), self.fH, self.f1, self.f2, ','.join("%X" %f for f in self.fA))
+
+class Material():
+	def __init__(self):
+		self.data = {}
+	def set(self, name, value): self.data[name] = value
+	def get(self, name, default=None):
+		value = None
+		if (name in self.data): value = self.data[name]
+		if (value is None): return default
+		return value
 
 def getNode(index):
 	global SCENE_LIST
@@ -331,8 +341,6 @@ def getPoint(float, default = 0.0):
 				return f.getFirst(0x2501).data[0]
 			except:
 				FreeCAD.Console.PrintWarning("SyntaxError: %s - assuming 0.0!\n" %(float))
-#		else:
-#			FreeCAD.Console.PrintWarning("%s has not 0x7127 - assuming 0.0!\n" %(float))
 		return default
 	if (uid == 0x71F11549498702E7): # Float Wire
 		f = getReferences(float)[0]
@@ -365,9 +373,9 @@ def getPosition(pos):
 			pos = None
 			FreeCAD.Console.PrintError("Unknown position 0x%04X=%s!\n" %(uid, pos))
 		if (pos):
-			mtx[0,3] = -pos[0]
-			mtx[1,3] = -pos[1]
-			mtx[2,3] = -pos[2]
+			mtx[0,3] = pos[0]
+			mtx[1,3] = pos[1]
+			mtx[2,3] = pos[2]
 	return mtx
 
 def getRotation(pos):
@@ -424,8 +432,6 @@ def getScale(pos):
 def createMatrix(prc):
 	mtx = numpy.identity(4, numpy.float32)
 
-#	pvt = track.getSubChunk(TRK_PIVOT)
-#	mtx = numpy.dot(mtx, pvt.getMatrix()) # pivot has not frame correlation!
 	uid = getGUID(prc)
 	scl = None
 	rot = None
@@ -437,19 +443,112 @@ def createMatrix(prc):
 	elif (uid == 0x9154) : # BipSlave Control
 		bipedSubAnim = getReferences(prc)[2]
 		refs = getReferences(bipedSubAnim)
-		#not supported!
 		scl = getScale(getReferences(refs[1])[0])
 		rot = getRotation(getReferences(refs[2])[0])
 		pos = getPosition(getReferences(refs[3])[0])
 
+	if (pos is not None):
+		mtx = numpy.dot(mtx, pos)
 	if (rot is not None):
 		mtx = numpy.dot(mtx, rot)
 	if (scl is not None):
 		mtx = numpy.dot(mtx, scl)
-	if (pos is not None):
-		mtx = numpy.dot(mtx, pos)
 
 	return mtx
+
+def getProperty(properties, idx):
+	for child in properties.children:
+		if (child.type == 0x100E):
+			if (getShort(child.data, 0)[0] == idx): return child
+	return None
+
+def getColorMax(colors, idx):
+	prp = getProperty(colors, idx)
+	if (prp is not None):
+		c, o = getFloats(prp.data, 15, 3)
+		return (c[0], c[1], c[2])
+	return None
+
+def getFloatMax(colors, idx):
+	prp = getProperty(colors, idx)
+	if (prp is not None):
+		f, o = getFloat(prp.data, 15)
+		return f
+	return None
+
+def getMatStandard(refs):
+	material = None
+	try:
+		colors = refs[2]
+		parameters = getReferences(colors)[0] # ParameterBlock2
+		material = Material()
+		material.set('ambient',  getColorMax(parameters, 0x00))
+		material.set('diffuse',  getColorMax(parameters, 0x01))
+		material.set('specular', getColorMax(parameters, 0x02))
+		material.set('emissive', getColorMax(parameters, 0x08))
+		material.set('shinines', getFloatMax(parameters, 0x0A))
+		transparency = refs[4] # ParameterBlock2
+		material.set('transparency', getFloatMax(transparency, 0x02))
+	except:
+		FreeCAD.Console.PrintError(traceback.format_exc())
+		FreeCAD.Console.PrintError('\n')
+	return material
+
+def getMatVRay(vry):
+	material = Material()
+	try:
+		material.set('diffuse',  getColorMax(vry, 0x01))
+		material.set('ambient',  getColorMax(vry, 0x02))
+		material.set('specular', getColorMax(vry, 0x05))
+#		material.set('emissive', getColorMax(vry, 0x05))
+#		material.set('shinines', getFloatMax(vry, 0x0B))
+#		material.set('transparency', getFloatMax(vry, 0x02))
+	except:
+		FreeCAD.Console.PrintError(traceback.format_exc())
+		FreeCAD.Console.PrintError('\n')
+	return material
+
+def getMatArchDesign(ad):
+	material = Material()
+	try:
+		material.set('diffuse',  getColorMax(ad, 0x1A))
+#		material.set('ambient',  getColorMax(ad, 0x02))
+#		material.set('specular', getColorMax(ad, 0x05))
+#		material.set('emissive', getColorMax(ad, 0x05))
+#		material.set('shinines', getFloatMax(ad, 0x0B))
+#		material.set('transparency', getFloatMax(ad, 0x02))
+	except:
+		FreeCAD.Console.PrintError(traceback.format_exc())
+		FreeCAD.Console.PrintError('\n')
+	return material
+
+def adjustMaterial(obj, mat):
+	material = None
+	if (mat is not None):
+		uid = getGUID(mat)
+
+		if (uid == 0x0002): # 'Standard'
+			refs = getReferences(mat)
+			material = getMatStandard(refs)
+		elif (uid == 0x0000000000000200): # 'Multi/Sub-Object'
+			refs = getReferences(mat)
+			material = adjustMaterial(obj, refs[-1])
+		elif (uid == 0x7034695C37BF3F2F): # 'VRayMtl'
+			refs = getTypedRefernces(mat)
+			material = getMatVRay(refs[1])
+		elif (uid == 0x4A16365470B05735): # 'Arch & Design'
+			refs = getReferences(mat)
+			material = getMatArchDesign(refs[0])
+		else:
+			FreeCAD.Console.PrintWarning("Unknown material GUID=%016X (%s) - skipped\n!" %(uid, getClsName(mat)))
+
+		if (obj is not None) and (material is not None):
+			obj.ViewObject.ShapeMaterial.AmbientColor  = material.get('ambient',  (0,0,0))
+			obj.ViewObject.ShapeMaterial.DiffuseColor  = material.get('diffuse',  (0.8,0.8,0.8))
+			#obj.ViewObject.ShapeMaterial.EmissiveColor = material.get('emissive', (0,0,0))
+			obj.ViewObject.ShapeMaterial.SpecularColor = material.get('specular', (0,0,0))
+			obj.ViewObject.ShapeMaterial.Shininess     = material.get('shinines', 0.2)
+			obj.ViewObject.ShapeMaterial.Transparency  = material.get('transparency', 0.0)
 
 def createShape3d(doc, pts, indices,  shape, key, prc, mat):
 	name = shape.getFirst(0x0962).data
@@ -481,6 +580,7 @@ def createShape3d(doc, pts, indices,  shape, key, prc, mat):
 				mtx[0][2], mtx[1][2], mtx[2][2], mtx[3][2],
 				mtx[0][3], mtx[1][3], mtx[2][3], mtx[3][3],
 			)
+			adjustMaterial(obj, mat)
 			return True
 	FreeCAD.Console.PrintWarning("no faces ... ")
 	return True
@@ -630,6 +730,7 @@ def createEditablePoly(doc, shape, msh, mat, mtx):
 				for key, ngons in vertex.items():
 					created |= createShape3d(doc, coords, ngons, shape, key, mtx, mat)
 			else:
+				created = True
 				FreeCAD.Console.PrintWarning("no faces ... ")
 		elif (point6i is not None):
 			ngons = getNGons6i(point6i)
@@ -665,15 +766,22 @@ def createEditableMesh(doc, shape, msh, mat, mtx):
 
 	return created
 
-def getMatMshMatLyr(shape):
+def getMtxMshMatLyr(shape):
 	refs = getTypedRefernces(shape)
 	if (refs):
-		return refs.get(0), refs.get(1), refs.get(3), refs.get(6) # Transformation, Mesh, Material, Layer
-	refs = getReferences(shape)
-	return refs[0], refs[1], refs[3], refs[6] # Transformation, Mesh, Material, Layer
+		mtx = refs.get(0, None)
+		msh = refs.get(1, None)
+		mat = refs.get(3, None)
+		lyr = refs.get(6, None)
+	else:
+		refs = getReferences(shape)
+		mtx = refs[0]
+		msh = refs[1]
+		mat = refs[3]
+		lyr = refs[6]
+	return mtx, msh, mat, lyr
 
 def createShell(doc, shape, shell, mat, mtx):
-	# skip creating Shell!
 	refs = getReferences(shell)
 	msh = refs[-1]
 	created, uid = createMesh(doc, shape, msh, mtx, mat)
@@ -736,7 +844,7 @@ def createObject(doc, shape):
 	parent = getNodeParent(shape)
 	shape.parent = parent
 	name = getNodeName(shape)
-	mtx, msh, mat, lyr = getMatMshMatLyr(shape)
+	mtx, msh, mat, lyr = getMtxMshMatLyr(shape)
 	while ((parent is not None) and (getGUID(parent) != 0x0002)):
 		name = "%s/%s" %(getNodeName(parent), name)
 		prnMtx = parent.matrix
