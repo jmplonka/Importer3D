@@ -135,9 +135,9 @@ class ContainerChunk(AbstractChunk):
 			if (child.type == type): return child
 		return None
 	def setData(self, data):
-		previous       = None
-		next           = None
-		reader         = ChunkReader()
+		previous = None
+		next     = None
+		reader   = ChunkReader()
 		if (DEBUG): FreeCAD.Console.PrintMessage("%s\n" %(self))
 		self.children  = reader.getChunks(data, self.level + 1, ContainerChunk, self.primitiveReader)
 
@@ -301,14 +301,12 @@ def getTypedRefernces(chunk):
 	return references
 
 def readChunks(ole, name, fileName, containerReader=ContainerChunk, primitiveReader=ByteArrayChunk):
-	file = ole.openstream(name)
-	scene = file.read()
-	file.close()
-#	with open(fileName, 'wb') as file:
-#		file.write(scene)
-#		file.close()
-	reader = ChunkReader(name)
-	return reader.getChunks(scene, 0, containerReader, primitiveReader)
+	with ole.openstream(name) as file:
+		scene = file.read()
+#		with open(fileName, 'wb') as file:
+#			file.write(scene)
+		reader = ChunkReader(name)
+		return reader.getChunks(scene, 0, containerReader, primitiveReader)
 
 def readClassData(ole, fileName):
 	global CLS_DATA
@@ -552,7 +550,6 @@ def adjustMaterial(obj, mat):
 
 def createShape3d(doc, pts, indices,  shape, key, prc, mat):
 	name = shape.getFirst(0x0962).data
-	idx = 0
 	cnt = len(pts)
 	if (cnt > 0):
 		if (key is not None): name = "%s_%d" %(name, key)
@@ -574,12 +571,6 @@ def createShape3d(doc, pts, indices,  shape, key, prc, mat):
 
 		if (len(data) > 0):
 			obj = newObject(doc, name, data)
-			m = FreeCAD.Matrix(
-				mtx[0][0], mtx[1][0], mtx[2][0], mtx[3][0],
-				mtx[0][1], mtx[1][1], mtx[2][1], mtx[3][1],
-				mtx[0][2], mtx[1][2], mtx[2][2], mtx[3][2],
-				mtx[0][3], mtx[1][3], mtx[2][3], mtx[3][3],
-			)
 			adjustMaterial(obj, mat)
 			return True
 	FreeCAD.Console.PrintWarning("no faces ... ")
@@ -587,19 +578,25 @@ def createShape3d(doc, pts, indices,  shape, key, prc, mat):
 
 def calcCoordinates(data):
 	l, o = getInt(data, 0)
-	p = []
+	cnt = len(data) / 16
+	p = numpy.zeros((cnt, 3), numpy.float32)
+	i = 0
 	while o < len(data):
 		w, o = getInt(data, o)
 		f, o = getFloats(data, o, 3)
-		p.append([f[0], f[1], f[2]])
+		p[i:0:3] = f
+		i += 1
 	return p
 
 def calcCoordinatesI(data):
 	l, o = getInt(data, 0)
-	p = []
+	cnt = len(data) / 12
+	p = numpy.zeros((cnt, 3), numpy.float32)
+	i = 0
 	while (o < len(data)):
-		v, o = getFloats(data, o, 3)
-		p.append(v)
+		f, o = getFloats(data, o, 3)
+		p[i:0:3] = f
+		i += 1
 	return p
 
 def getNGons4i(points):

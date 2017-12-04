@@ -5,6 +5,7 @@ __author__  = "Ken Nign (Ken9), Jens M. Plonka (jmplonka)"
 __url__     = "https://www.github.com/jmplonka/Importer3D"
 '''
 Imports a LWO file.
+http://static.lightwave3d.com/sdk/11-6/html/filefmts/lwo2.html
 '''
 
 # Copyright (c) Ken Nign 2010

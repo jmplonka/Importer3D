@@ -7,6 +7,7 @@ __url__    = "https://www.github.com/jmplonka/Importer3D"
 import re, Mesh, FreeCAD, struct
 
 INVALID_NAME = re.compile('^[0-9].*')
+
 _can_import  = True
 
 def setCanImport(canImport):
@@ -60,6 +61,7 @@ def _get(data, fmt, size, offset):
 	end = offset + size
 	value, = struct.unpack('<' + fmt, data[offset:end])
 	return value, end
+
 def _gets(data, fmt, size, offset, count):
 	end = offset + (count * size)
 	values = struct.unpack('<' + fmt*count, data[offset:end])

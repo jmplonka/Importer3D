@@ -4,7 +4,7 @@ __title__  = "Collection of 3D Mesh importers"
 __author__ = "Jens M. Plonka"
 __url__    = "https://www.github.com/jmplonka/Importer3D"
 
-import os, FreeCAD, import3DS, importLWO, importMAX
+import os, FreeCAD, import3DS, importLWO, importMAX, importMB, importGSM
 
 def decode(name):
 	"decodes encoded strings"
@@ -19,13 +19,20 @@ def decode(name):
 	return decodedName
 
 def read(doc, filename):
-	ext = filename[-4:].lower()
+	name, ext = os.path.splitext(filename)
+	ext = ext.lower()
 	if (ext == '.lwo'):
 		importLWO.read(doc, filename)
 	elif (ext == '.3ds'):
 		import3DS.read(doc, filename)
 	elif (ext == '.max'):
 		importMAX.read(doc, filename)
+#	elif (ext == '.ma'):
+#		importMaya.read(doc, filename)
+	elif (ext == '.mb'):
+		importMB.read(doc, filename)
+	elif (ext == '.gsm'):
+		importGSM.read(doc, filename)
 	else:
 		FreeCAD.Console.PrintError("No suitable reader found for ext=%s\n" %(ext))
 	return

@@ -184,7 +184,7 @@ def getChunkName(chunk):
 
 def getData(chunk, id):
 	subChunk = chunk.getSubChunk(id)
-	if (subChunk): return subChunk.data
+	if (subChunk is not None): return subChunk.data
 	return None
 
 def getSplineTerms(accelerationData, chopper):
@@ -200,23 +200,6 @@ def _dotchain(first, *rest):
     for next in rest:
         matrix = numpy.dot(matrix, next)
     return matrix
-
-def createKeyMatrix(track, frame):
-	mtx = numpy.identity(4, numpy.float32)
-
-	pvt = track.getSubChunk(TRK_PIVOT)
-	if (pvt is not None): mtx = numpy.dot(mtx, pvt.getMatrix()) # pivot has not frame correlation!
-
-	rot = track.getSubChunk(TRK_ROTATION)
-	if (rot is not None): mtx = numpy.dot(mtx, rot.getMatrix(frame))
-
-	scl = track.getSubChunk(TRK_SCALE)
-	if (scl is not None): mtx = numpy.dot(mtx, scl.getMatrix(frame))
-
-	pos = track.getSubChunk(TRK_POSITION)
-	if (pos is not None): mtx = numpy.dot(mtx, pos.getMatrix(frame))
-
-	return mtx
 
 class AbstractChunk():
 	def __init__(self, id, l):
@@ -331,15 +314,25 @@ class MaterialChunk(AbstractChunk):
 
 class MeshInfoChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
+
+	def createKeyMatrix(self, frame):
+		pvt = self.getSubChunk(TRK_PIVOT).getMatrix() # pivot has not frame correlation!
+		scl = self.getSubChunk(TRK_SCALE).getMatrix(frame)
+		rot = self.getSubChunk(TRK_ROTATION).getMatrix(frame)
+		pos = self.getSubChunk(TRK_POSITION).getMatrix(frame)
+		return _dotchain(numpy.identity(4, numpy.float32), pvt, scl, rot, pos)
+
 	def initialize(self, chopper):
 		hi = self.getSubChunk(HIERARCHY_INFO) # build up tree!
 		hrx = self.getSubChunk(HIERARCHY)
 		FreeCAD.Console.PrintMessage("Adding '%s'\n" %(hrx.name))
-		mtx = createKeyMatrix(self, chopper.currentFrame)
+		#mtx = self.createKeyMatrix(chopper.currentFrame)
+		mtx = self.createKeyMatrix(0)
 		parent = chopper.keyMatrix.get(hrx.getParentId())
 		if (parent is not None):
 			prnMtx = parent.matrix
-			if (prnMtx): mtx = mtx.dot(prnMtx)
+			if (prnMtx):
+				mtx = mtx.dot(prnMtx)
 		self.matrix = mtx
 		chopper.keyMatrix[hi.data] = self
 		nObj = chopper.namedObjectes.get(hrx.name)
@@ -352,8 +345,7 @@ class MeshInfoChunk(AbstractChunk):
 					mat = dsc.getSubChunk(TRI_MATERIAL)
 
 					plc = mObj.getSubChunk(TRI_PLACEMENT) # the 3D object faces              => PlacementChunk
-					mshMtx = plc.getMatrix()
-					mtx = numpy.dot(mshMtx, mtx)
+					mtx = numpy.dot(plc.getMatrix(), mtx)
 
 					# translate the points according to the transformation matrix
 					pt = numpy.ones((len(pts), 4), numpy.float32)
@@ -591,9 +583,10 @@ class Vertex2ListChunk(AbstractChunk):
 class Vertex3ListChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
 	def loadData(self, chopper):
-		numVertices = chopper.getUnsignedShort()
-		self.data = [None] * numVertices
-		for i in range(numVertices): self.data.append(chopper.getPoint3f())
+		cnt = chopper.getUnsignedShort()
+		self.data = numpy.zeros((cnt, 3), numpy.float32)
+		for i in xrange(cnt):
+			self.data[i,0:3] = chopper.getPoint3f()
 
 class Importer:
 	def __init__(self, doc, filename):
@@ -720,7 +713,7 @@ class Importer:
 			if (material):
 				obj.ViewObject.ShapeMaterial.AmbientColor  = material.get('ambient',  (0,0,0))
 				obj.ViewObject.ShapeMaterial.DiffuseColor  = material.get('diffuse',  (0.8,0.8,0.8))
-				#obj.ViewObject.ShapeMaterial.EmissiveColor = material.get('emissive', (0,0,0))
+#				obj.ViewObject.ShapeMaterial.EmissiveColor = material.get('emissive', (0,0,0))
 				obj.ViewObject.ShapeMaterial.SpecularColor = material.get('specular', (0,0,0))
 				obj.ViewObject.ShapeMaterial.Shininess     = material.get('shinines', 0.2)
 				obj.ViewObject.ShapeMaterial.Transparency  = material.get('transparency', 0.0)
