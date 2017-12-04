@@ -196,10 +196,13 @@ def getSplineTerms(accelerationData, chopper):
 			x = chopper.getFloat()
 
 def _dotchain(first, *rest):
-    matrix = first
-    for next in rest:
-        matrix = numpy.dot(matrix, next)
-    return matrix
+	matrix = first
+	if (matrix is None):
+		matrix = numpy.identity(4, numpy.float32)
+	for next in rest:
+		if (next is not None):
+			matrix = numpy.dot(matrix, next)
+	return matrix
 
 class AbstractChunk():
 	def __init__(self, id, l):
@@ -315,11 +318,18 @@ class MaterialChunk(AbstractChunk):
 class MeshInfoChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
 
+	def getChunkFrameMatrix(self, name, frame):
+		chunk = self.getSubChunk(name)
+		if (chunk is None): return None
+		return chunk.getMatrix(frame)
+
 	def createKeyMatrix(self, frame):
-		pvt = self.getSubChunk(TRK_PIVOT).getMatrix() # pivot has not frame correlation!
-		scl = self.getSubChunk(TRK_SCALE).getMatrix(frame)
-		rot = self.getSubChunk(TRK_ROTATION).getMatrix(frame)
-		pos = self.getSubChunk(TRK_POSITION).getMatrix(frame)
+		chunk = self.getSubChunk(TRK_PIVOT)
+		pvt = chunk.getMatrix() if (chunk) else None # pivot has not frame correlation!
+
+		scl = self.getChunkFrameMatrix(TRK_SCALE, frame)
+		rot = self.getChunkFrameMatrix(TRK_ROTATION, frame)
+		pos = self.getChunkFrameMatrix(TRK_POSITION, frame)
 		return _dotchain(numpy.identity(4, numpy.float32), pvt, scl, rot, pos)
 
 	def initialize(self, chopper):
@@ -331,7 +341,7 @@ class MeshInfoChunk(AbstractChunk):
 		parent = chopper.keyMatrix.get(hrx.getParentId())
 		if (parent is not None):
 			prnMtx = parent.matrix
-			if (prnMtx):
+			if (prnMtx is not None):
 				mtx = mtx.dot(prnMtx)
 		self.matrix = mtx
 		chopper.keyMatrix[hi.data] = self

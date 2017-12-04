@@ -37,11 +37,12 @@ def missingDependency(module, url, folder):
 	FreeCAD.Console.PrintWarning("DONE!\n")
 	setCanImport(False)
 
+def getValidName(name):
+	if (INVALID_NAME.match(name)): return '_' + name.encode('utf8')
+	return name.encode('utf8')
+
 def newObject(doc, name, data):
-	if (INVALID_NAME.match(name)):
-		obj = doc.addObject('Mesh::Feature', '_' + name.encode('utf8'))
-	else:
-		obj = doc.addObject('Mesh::Feature', name.encode('utf8'))
+	obj = doc.addObject('Mesh::Feature', getValidName(name))
 	if (obj):
 		obj.Label = name
 		obj.Mesh = Mesh.Mesh(data)

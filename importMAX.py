@@ -5,7 +5,7 @@ __author__ = "Jens M. Plonka"
 __url__    = "https://www.github.com/jmplonka/Importer3D"
 
 import FreeCAD, triangulate, numpy, zlib, sys, traceback
-from importUtils import missingDependency, canImport, newObject, getByte, getShorts, getShort, getInts, getInt, getLong, getFloats, getFloat
+from importUtils import missingDependency, canImport, newObject, getValidName, getByte, getShorts, getShort, getInts, getInt, getLong, getFloats, getFloat
 from math        import degrees
 
 try:
@@ -23,6 +23,29 @@ DLL_DIR_LIST  = []
 CLS_DIR3_LIST = []
 VID_PST_QUE   = []
 SCENE_LIST    = []
+
+SKIPPABLE = {
+	0x0000000000001002: 'Camera',
+	0x0000000000001011: 'Omni',
+	0x0000000000001013: 'Free Direct',
+	0x0000000000001020: 'Camera Target',
+	0x0000000000001040: 'Line',
+	0x0000000000001065: 'Rectangle',
+	0x0000000000001097: 'Ellipse',
+	0x0000000000001999: 'Circle',
+	0x0000000000002013: 'Point',
+	0x0000000000009125: 'Biped Object',
+	0x0000000000876234: 'Dummy',
+	0x05622B0D69011E82: 'Compass',
+	0x12A822FB76A11646: 'CV Surface',
+	0x1EB3430074F93B07: 'Particle View',
+	0x2ECCA84028BF6E8D: 'Bone',
+	0x3BDB0E0C628140F6: 'VRayPlane',
+	0x4E9B599047DB14EF: 'Slider',
+	0x522E47057BF61478: 'Sky',
+	0x5FD602DF3C5575A1: 'VRayLight',
+	0x77566F65081F1DFC: 'Plane',
+}
 
 class AbstractChunk():
 	def __init__(self, type, size, level, number):
@@ -80,6 +103,7 @@ class ByteArrayChunk(AbstractChunk):
 		elif (self.type == 0x2510): self.set(data, "struct", '<' + 'f'*((len(data)/4) - 1) + 'i', 0, len(data))
 		elif (self.type == 0x2511): self.set(data, "float[]", '<' + 'f'*(len(data)/4), 0, len(data))
 		elif (self.type == 0x4001): self.setStr16(data)
+		elif (self.type == 0x0100): self.set(data, "float", '<f' , 0, len(data))
 		else:
 			self.unknown = True
 			self.data = data
@@ -314,7 +338,11 @@ def readClassData(ole, fileName):
 
 def readClassDirectory3(ole, fileName):
 	global CLS_DIR3_LIST
-	CLS_DIR3_LIST = readChunks(ole, 'ClassDirectory3', fileName+'.ClsDir3.bin', ContainerChunk, ClsDir3Chunk)
+
+	try:
+		CLS_DIR3_LIST = readChunks(ole, 'ClassDirectory3', fileName+'.ClsDir3.bin', ContainerChunk, ClsDir3Chunk)
+	except:
+		CLS_DIR3_LIST = readChunks(ole, 'ClassDirectory', fileName+'.ClsDir.bin', ContainerChunk, ClsDir3Chunk)
 	for clsDir in CLS_DIR3_LIST:
 		clsDir.dll = getDll(clsDir)
 
@@ -477,16 +505,17 @@ def getFloatMax(colors, idx):
 def getMatStandard(refs):
 	material = None
 	try:
-		colors = refs[2]
-		parameters = getReferences(colors)[0] # ParameterBlock2
-		material = Material()
-		material.set('ambient',  getColorMax(parameters, 0x00))
-		material.set('diffuse',  getColorMax(parameters, 0x01))
-		material.set('specular', getColorMax(parameters, 0x02))
-		material.set('emissive', getColorMax(parameters, 0x08))
-		material.set('shinines', getFloatMax(parameters, 0x0A))
-		transparency = refs[4] # ParameterBlock2
-		material.set('transparency', getFloatMax(transparency, 0x02))
+		if (len(refs) > 2):
+			colors = refs[2]
+			parameters = getReferences(colors)[0] # ParameterBlock2
+			material = Material()
+			material.set('ambient',  getColorMax(parameters, 0x00))
+			material.set('diffuse',  getColorMax(parameters, 0x01))
+			material.set('specular', getColorMax(parameters, 0x02))
+			material.set('emissive', getColorMax(parameters, 0x08))
+			material.set('shinines', getFloatMax(parameters, 0x0A))
+			transparency = refs[4] # ParameterBlock2
+			material.set('transparency', getFloatMax(transparency, 0x02))
 	except:
 		FreeCAD.Console.PrintError(traceback.format_exc())
 		FreeCAD.Console.PrintError('\n')
@@ -581,10 +610,10 @@ def calcCoordinates(data):
 	cnt = len(data) / 16
 	p = numpy.zeros((cnt, 3), numpy.float32)
 	i = 0
-	while o < len(data):
+	while (o < len(data)):
 		w, o = getInt(data, o)
 		f, o = getFloats(data, o, 3)
-		p[i:0:3] = f
+		p[i,] = f
 		i += 1
 	return p
 
@@ -725,6 +754,7 @@ def createEditablePoly(doc, shape, msh, mat, mtx):
 			vertex = getNGons4i(point4i)
 			if (len(vertex) > 0):
 				for key, ngons in vertex.items():
+					FreeCAD.Console.PrintMessage("[%d] " %(key))
 					created |= createShape3d(doc, coords, ngons, shape, key, mtx, mat)
 			else:
 				created = True
@@ -775,16 +805,115 @@ def getMtxMshMatLyr(shape):
 		mtx = refs[0]
 		msh = refs[1]
 		mat = refs[3]
-		lyr = refs[6]
+		lyr = None
+		if (len(refs) > 6):
+			lyr = refs[6]
 	return mtx, msh, mat, lyr
 
 def createShell(doc, shape, shell, mat, mtx):
+	FreeCAD.Console.PrintMessage("building 'Shell_%X' ... " %(getGUID(shell)))
 	refs = getReferences(shell)
 	msh = refs[-1]
 	created, uid = createMesh(doc, shape, msh, mtx, mat)
 	if (not created):
 		FreeCAD.Console.PrintError("hugh? %016X: %s - " %(uid, getClsName(msh)))
 	return created
+
+def adjustPlacement(obj, node):
+	mtx = createMatrix(node).flatten()
+	obj.Placement = FreeCAD.Placement(FreeCAD.Matrix(*mtx))
+
+def createBox(doc, shape, box, mat, mtx):
+	FreeCAD.Console.PrintMessage("building 'Box' ... ")
+	pBlock = getReferences(box)[0]
+	# length (float)             [2]
+	# width (float)              [3]
+	# height (float)             [4]
+	# segments length (int)      [5]
+	# segments width (int)       [6]
+	# segments height (int)      [7]
+	# general mapping (bool)     [8]
+	# real world map size (bool) [9]
+	name = shape.getFirst(0x0962).data
+	obj = doc.addObject("Part::Box", getValidName(name))
+	obj.Label = name
+	obj.Length = pBlock.children[2].getFirst(0x0100).data[0]
+	obj.Width = pBlock.children[3].getFirst(0x0100).data[0]
+	obj.Height = pBlock.children[4].getFirst(0x0100).data[0]
+	adjustPlacement(obj, mtx)
+	return True
+
+def createSphere(doc, shape, cylinder, mat, mtx):
+	FreeCAD.Console.PrintMessage("building 'Sphere' ... ")
+	pBlock = getReferences(cylinder)[0]
+	# radius (float)             [2]
+	# height (float)             [3]
+	# real world map size (bool) [4]
+	# general mapping (bool)     [5]
+	# segments height (int)      [6]
+	# segments cap (int)         [7]
+	# slice (bool)               [8]
+	# sliceFrom (float)          [9]
+	# smoothing (bool)           [A]
+	# sliceTo float)             [B]
+	name = shape.getFirst(0x0962).data
+	obj = doc.addObject("Part::Sphere", getValidName(name))
+	obj.Label = name
+	obj.Radius = pBlock.children[2].getFirst(0x0100).data[0]
+	adjustPlacement(obj, mtx)
+	return True
+
+def createCylinder(doc, shape, cylinder, mat, mtx):
+	FreeCAD.Console.PrintMessage("building 'Cylinder' ... ")
+	pBlock = getReferences(cylinder)[0]
+	# radius (float)             [2]
+	# height (float)             [3]
+	# real world map size (bool) [4]
+	# general mapping (bool)     [5]
+	# segments height (int)      [6]
+	# segments cap (int)         [7]
+	# slice (bool)               [8]
+	# sliceFrom (float)          [9]
+	# smoothing (bool)           [A]
+	# sliceTo float)             [B]
+	name = shape.getFirst(0x0962).data
+	obj = doc.addObject("Part::Cylinder", getValidName(name))
+	obj.Label = name
+	obj.Radius = pBlock.children[2].getFirst(0x0100).data[0]
+	obj.Height = pBlock.children[3].getFirst(0x0100).data[0]
+	adjustPlacement(obj, mtx)
+	return True
+
+def createChamferBox(doc, shape, box, mat, mtx):
+	FreeCAD.Console.PrintMessage("building 'ChamferBox' ... ")
+	pBlock = getReferences(box)[0]
+	# length (float)             [2]
+	# width (float)              [3]
+	# height (float)             [4]
+	# fillet (float)             [5]
+	# segments length (int)      [6]
+	# segments height (int)      [7]
+	# segments width (int)       [8]
+	# segments fillet (int)      [9]
+	# general mapping (bool)     [A]
+	# real world map size (bool) [B]
+	# smoothing (bool)           [C]
+	name = shape.getFirst(0x0962).data
+	cube = doc.addObject("Part::Box", getValidName(name) + '_b')
+	cube.Label = name + '_b'
+	cube.Length = pBlock.children[2].getFirst(0x0100).data[0]
+	cube.Width = pBlock.children[3].getFirst(0x0100).data[0]
+	cube.Height = pBlock.children[4].getFirst(0x0100).data[0]
+	f = pBlock.children[5].getFirst(0x0100).data[0]
+#	chmfr = doc.addObject("Part::Chamfer", getValidName(name))
+#	adjustPlacement(cube, mtx)
+#	chmfr.Base = cube
+#	myEdges = []
+#	for i in xrange(12):
+#		myEdges.append(( i+1, fillet, fillet)) # (edge number, chamfer start length, chamfer end length)
+#	chmfr.Edges = myEdges
+#	cube.ViewObject.Visibility = False
+	return True
 
 def createSkippable(doc, shape, msh, mat, mtx, type):
 	# skip creating skippable!
@@ -798,42 +927,22 @@ def createMesh(doc, shape, msh, mtx, mat):
 		created = createEditableMesh(doc, shape, msh, mat, mtx)
 	elif (uid == 0x192F60981BF8338D):
 		created = createEditablePoly(doc, shape, msh, mat, mtx)
+	elif (uid == 0x0000000000000010): # Box
+		created = createBox(doc, shape, msh, mat, mtx)
+	elif (uid == 0x0000000000000011): # Sphere
+		created = createSphere(doc, shape, msh, mat, mtx)
+	elif (uid == 0x0000000000000012): # Cylinder
+		created = createCylinder(doc, shape, msh, mat, mtx)
 	elif (uid == 0x0000000000002032):
 		created = createShell(doc, shape, msh, mat, mtx)
 	elif (uid == 0x0000000000002033):
 		created = createShell(doc, shape, msh, mat, mtx)
-	elif (uid == 0x0000000000000011): # Sphere
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Sphere')
-	elif (uid == 0x0000000000001002): # Camera
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Camera')
-	elif (uid == 0x0000000000001011): # Omni
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Omni')
-	elif (uid == 0x0000000000001020): # Camera.Target
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Camera Target')
-	elif (uid == 0x0000000000001040): # Line
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Line')
-	elif (uid == 0x0000000000002013): # Point
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Point')
-	elif (uid == 0x0000000000009125): # Biped Object
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Biped Object')
-	elif (uid == 0x0000000000876234): # Dummy
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Dummy')
-	elif (uid == 0x12A822FB76A11646): # CV Surface
-		created = createSkippable(doc, shape, msh, mat, mtx, 'CV Surface')
-	elif (uid == 0x1EB3430074F93B07): # Particle View
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Particle View')
-	elif (uid == 0x2ECCA84028BF6E8D): # Bone
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Bone')
-	elif (uid == 0x4E9B599047DB14EF): # Slider
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Slider')
-	elif (uid == 0x3BDB0E0C628140F6): # VRayPlane
-		created = createSkippable(doc, shape, msh, mat, mtx, 'VRayPlane')
-	elif (uid == 0x05622B0D69011E82): # Compass
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Compass')
-	elif (uid == 0x5FD602DF3C5575A1): # VRayLight
-		created = createSkippable(doc, shape, msh, mat, mtx, 'VRayLight')
-	elif (uid == 0x522E47057BF61478): # Sky
-		created = createSkippable(doc, shape, msh, mat, mtx, 'Sky')
+	elif (uid == 0x48EA0F971AD73F40): # ChamferBox
+		created = createChamferBox(doc, shape, msh, mat, mtx)
+	else:
+		type = SKIPPABLE.get(uid)
+		if (type is not None):
+			created = createSkippable(doc, shape, msh, mat, mtx, type)
 
 	return created, uid
 
@@ -859,6 +968,7 @@ def createObject(doc, shape):
 		else:
 			FreeCAD.Console.PrintWarning("skipped object %016X=%s!\n" %(uid, msh))
 	else:
+		doc.recompute()
 		FreeCAD.Console.PrintMessage("DONE!\n")
 
 def makeScene(doc, parent, level = 0):
