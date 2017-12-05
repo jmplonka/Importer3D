@@ -325,7 +325,7 @@ class MeshInfoChunk(AbstractChunk):
 
 	def createKeyMatrix(self, frame):
 		chunk = self.getSubChunk(TRK_PIVOT)
-		pvt = chunk.getMatrix() if (chunk) else None # pivot has not frame correlation!
+		pvt = chunk.getMatrix() if (chunk) else None # pivot has no frame correlation!
 
 		scl = self.getChunkFrameMatrix(TRK_SCALE, frame)
 		rot = self.getChunkFrameMatrix(TRK_ROTATION, frame)
