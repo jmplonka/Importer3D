@@ -252,10 +252,25 @@ class ReaderMB():
 	def readComponent(self, chunk):
 		self.readFlgs(chunk)
 		type = self.readTypeID()
-		if (type == 'CMDF'):
+		if (type == 'CCCV'):
 			data = (self.readInt(), self.readInt(), self.readInt())
 		elif (type == 'CLAT'):
 			data = self.readInts(7)
+		elif (type == 'CMDE'):
+			data = self.readInts(16)
+			self.pos += self.pos % 4 # align to 32 Bit
+		elif (type == 'CMDF'):
+			data = (self.readInt(), self.readInt(), self.readInt())
+		elif (type == 'CSCV'):
+			data = (self.readInt(), self.readInt(), self.readInt(), self.readInt(), self.readInt())
+		elif (type == 'CMDV'):
+			num = self.readInt()
+			a = []
+			for i in range(0, num):
+				a.append(self.readInts(2))
+			b = self.readByte()
+			self.pos += self.pos % 2 # align to 16 Bit
+			data = (a, b)
 		else:
 			raise Exception("Unknow attribute type '%s'!" %(type))
 		chunk.data = (chunk.data, type, data)
