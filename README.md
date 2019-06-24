@@ -8,3 +8,5 @@ FreeCAD Addon to import several 3D files 3D Studio Max (*.3ds, *.max), LightWave
 
 0.3 - Import of  Autodesk Maya File (*.MD) and GSkin-Mesh (*.GSM)
 
+## License
+GNU GPL
