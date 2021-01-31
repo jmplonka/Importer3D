@@ -19,21 +19,11 @@ def canImport():
 	global _can_import
 	return _can_import
 
-def missingDependency(module, url, folder):
+def missingDependency(module):
 	import os
 	import subprocess
 
-	addinpath = os.path.dirname(os.path.abspath(__file__))
-	if (not os.path.exists(addinpath + "/libs")):
-		print "Libs does not exists will try to unpack them ... "
-		import zipfile
-		zip = zipfile.ZipFile(addinpath + "/libs.zip", 'r')
-		zip.extractall(addinpath)
-		zip.close()
-		FreeCAD.Console.PrintWarning("DONE!\n")
-	FreeCAD.Console.PrintWarning("Trying to install missing site-package '%s' ... " %(module))
-	os.chdir(addinpath + "/libs")
-	subprocess.call(['python', 'installLibs.py', addinpath, url, folder])
+	subprocess.call(['python', '-m', 'pip', 'install', module])
 	FreeCAD.Console.PrintWarning("DONE!\n")
 	setCanImport(False)
 

@@ -438,7 +438,7 @@ def read(doc, fileName):
 
 if __name__ == '__main__':
 	if (len(sys.argv) > 1):
-		print sys.argv[1]
+		print(sys.argv[1])
 		read(FreeCAD.ActiveDocument, sys.argv[1])
 	else:
 		read(FreeCAD.ActiveDocument, u"D:/documents/NOTE/3d/ArmChair/Armchair fotel b6500.gsm")

@@ -361,7 +361,7 @@ class ReaderMB():
 				id   = self.readTypeID()
 				next = Container(type, id, self.pos, size, level)
 				self.current = next
-				if (DEBUG): print next
+				if (DEBUG): print(next)
 				self.analyseContainer(next)
 			else:
 				size = self.readSize()
@@ -370,11 +370,11 @@ class ReaderMB():
 				pos = self.pos
 				method(self, next)
 				if (self.pos < pos+size):
-					if (DEBUG): print "%s - Bytes not read: %s"%(type, ":".join(["%02X" %(ord(c)) for c in self.data[self.pos:pos+size]]))
+					if (DEBUG): print("%s - Bytes not read: %s"%(type, ":".join(["%02X" %(ord(c)) for c in self.data[self.pos:pos+size]])))
 				self.pos = pos + size
 				if (size % self.alignment):
 					self.pos += self.alignment - (size % self.alignment) # add padding bytes due to alignment
-				if (DEBUG): print next
+				if (DEBUG): print(next)
 		return next
 
 	def analyseContainer(self, container):

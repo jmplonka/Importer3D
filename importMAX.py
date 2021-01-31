@@ -11,7 +11,7 @@ from math        import degrees
 try:
 	import olefile
 except:
-	missingDependency("olefile", "http://www.decalage.info/python/olefileio", "olefile")
+	missingDependency("olefile")
 
 import struct
 
