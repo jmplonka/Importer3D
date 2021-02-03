@@ -216,7 +216,8 @@ class AbstractChunk():
 		self.data        = []
 		self.subChunks   = {}
 	def __str__(self): return "%s" % (getChunkName(self))
-	def addSubChunk(self, subId, subChunk):
+	def addSubChunk(self, subChunk):
+		subId = subChunk.id
 		if (subId not in self.subChunks):
 			self.subChunks[subId] = []
 		chunkStack = self.subChunks[subId]
@@ -373,19 +374,19 @@ class MeshInfoChunk(AbstractChunk):
 				mtx = mtx.dot(prnMtx)
 		self.matrix = mtx
 		chopper.meshInfo[hi.data] = self
-		nObj = chopper.namedObjectes.get(hrx.name)
-		if (nObj):
-			mObj = nObj.getSubChunk(TRI_MESH_OBJ)
-			if (mObj):
-				dsc = mObj.getSubChunk(FACES_DESCRIPTION) # the 3D object faces              => FacesDescriptionChunk
-				if (dsc):
-					faces = dsc.getSubChunks(TRI_MATERIAL)
-					if (faces):
-						plc = mObj.getSubChunk(TRI_PLACEMENT) # the 3D object faces              => PlacementChunk
-						mtx = numpy.dot(plc.getMatrix(), mtx)
-						for face in faces:
-							points = face.getSubChunkData(TRI_VERTEXL)          # the 3D-point coordinates         => Vertex3ListChunk
-							dsc.createShape(chopper, face, mtx, face.name, points)
+#		nObj = chopper.namedObjectes.get(hrx.name)
+#		if (nObj):
+#			mObj = nObj.getSubChunk(TRI_MESH_OBJ)
+#			if (mObj):
+#				dsc = mObj.getSubChunk(FACES_DESCRIPTION) # the 3D object faces              => FacesDescriptionChunk
+#				if (dsc):
+#					faces = dsc.getSubChunks(TRI_MATERIAL)
+#					if (faces):
+#						plc = mObj.getSubChunk(TRI_PLACEMENT) # the 3D object faces              => PlacementChunk
+#						mtx = numpy.dot(plc.getMatrix(), mtx)
+#						points = mObj.getSubChunkData(TRI_VERTEXL)          # the 3D-point coordinates         => Vertex3ListChunk
+#						for face in faces:
+#							dsc.createShape(chopper, face, mtx, face.name, points)
 
 class NamedObjectChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
@@ -399,7 +400,14 @@ class NamedObjectChunk(AbstractChunk):
 				faces = dsc.getSubChunks(TRI_MATERIAL)
 				if (faces):
 					plc = mObj.getSubChunk(TRI_PLACEMENT) # the 3D object faces              => PlacementChunk
-					mtx = plc.getMatrix()
+					if (plc):
+						mtx = plc.getMatrix()
+					else:
+						mtx = numpy.array([
+							[1, 0, 0, 0], \
+							[0, 1, 0, 0], \
+							[0, 0, 1, 0], \
+							[0, 0, 0, 1]], numpy.float32)
 					points = mObj.getSubChunkData(TRI_VERTEXL)
 					for face in faces:
 						dsc.createShape(chopper, face, mtx, self.name, points)
@@ -499,9 +507,12 @@ class TrkPositionChunk(AbstractChunk):
 		for i in range(numKeys):
 			frm = chopper.getInt()
 			flg = chopper.getUnsignedShort()
-			tcb = chopper.getFloat()
+			if (self.flags):
+				tcb = chopper.getFloat()
+			else:
+				tcb = 0.0
 			pnt = chopper.getPoint3f()
-			self.data.append([frm, flg, tcb, pnt])
+			self.data.append([frm, flg, pnt, tcb])
 	def getMatrix(self, frame = 0):
 		mtx = numpy.identity(4,numpy.float32)
 		pos = self.data[frame][2]
@@ -660,8 +671,8 @@ class Importer:
 	def getPoint2f(self):           return unpack('<ff', self.file.read(8))
 	def getPoint3f(self):           return unpack('<fff', self.file.read(12))
 
-	def getChunkId2(self):	        return self.getUnsignedShort()
-	def getChunkLen4(self):	        return self.getInt()
+	def getChunkId(self):	        return self.getUnsignedShort()
+	def getChunkLen(self):	        return (self.getInt() - 6)
 	def getString(self):
 		buf = bytearray()
 		while True:
@@ -687,8 +698,8 @@ class Importer:
 
 		while (self.hasRemaining()):
 			try:
-				chunkId = self.getChunkId2()
-				chunkLen = self.getChunkLen4() - 6;
+				chunkId = self.getChunkId()
+				chunkLen = self.getChunkLen();
 				chunk = self.createChunk(chunkId, chunkLen);
 
 				finishedPosition = self.file.tell() + chunkLen;
@@ -696,9 +707,9 @@ class Importer:
 				self.limit = finishedPosition
 
 				if ((chunk is not None) and (chunk.len != 0)):
-					parentChunk.addSubChunk(chunkId, chunk)
+					parentChunk.addSubChunk(chunk)
 					chunk.loadData(self)
-					#FreeCAD.Console.PrintMessage("%sadded %s\n" %((level + 1) * '  ', chunk))
+#					FreeCAD.Console.PrintMessage("%sadded %s\n" %((level + 1) * '  ', chunk))
 					try:
 						if (self.hasRemaining()):
 							self.loadSubChunks(chunk, chunkLen, level + 1)
@@ -728,8 +739,8 @@ class Importer:
 
 def read(doc, filename):
 	reader = Importer(doc, filename)
-	chunkId = reader.getChunkId2()
-	chunkLen = reader.getChunkLen4() - 6
+	chunkId = reader.getChunkId()
+	chunkLen = reader.getChunkLen()
 	if (chunkId == MAIN):
 		chunk = reader.createChunk(chunkId, chunkLen)
 		reader.loadSubChunks(chunk, chunkLen)
