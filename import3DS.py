@@ -14,11 +14,14 @@ from math        import degrees, sqrt, sin, cos
 from importUtils import newObject
 
 VERSION                             = 0x0002
-COLOR                               = 0x0010
-RGB1                                = 0x0011
-RGB2                                = 0x0012
+COLOR                               = 0x0010 # 3 floats
+RGB1                                = 0x0011 # 3 bytes
+RGB2                                = 0x0012 # 3 floats (gamma corrected)
+RGB3                                = 0x0013 # 3 bytes (gamma corrected)
 INT_PERCENT                         = 0x0030
 SCALE                               = 0x0100
+SOLID_BGND                          = 0x1200
+SOLID_BGND_USED                     = 0x1201
 AMBIENT_COLOR                       = 0x2100
 EDITOR                              = 0x3D3D
 MESH_VERSION                        = 0x3D3E
@@ -94,86 +97,85 @@ TRK_ROTATION                        = 0xB021
 TRK_SCALE                           = 0xB022
 HIERARCHY_INFO                      = 0xB030
 DESC_MAP = { \
-	AMBIENT_COLOR                       : 'Ambient Color', \
-	AMBIENT_LIGHT_INFO                  : 'Ambient-Light-Info', \
-	ATTENUATED                          : 'Attentuated', \
-	BOUNDING_BOX                        : 'Bounding-Box', \
-	CAMERA                              : 'Camera', \
-	CAMERA_INFO                         : 'Camera-Info', \
-	CAMERA_TARGET_INFO                  : 'Camera-Target-Info', \
-	COLOR                               : 'Color', \
-	CURRENT_FRAME                       : 'Current-Frame', \
-	EDITOR                              : 'Editor', \
-	FACES_DESCRIPTION                   : 'Faces Description', \
-	FRAMES                              : 'Frames', \
-	HIERARCHY                           : 'Hierarchy', \
-	HIERARCHY_INFO                      : 'Hierarchy-Info', \
-	INT_PERCENT                         : 'Int-Percentage', \
-	KEYFRAMER                           : 'Keyframer', \
-	LIT_OFF                             : 'Off-Light', \
-	LIT_SPOT                            : 'Spot-Light', \
-	LIT_UNKNWN01                        : 'Unknown-Light', \
-	MAIN                                : 'Main 3DS', \
-	MAPPING                             : 'Mapping', \
-	MATERIAL                            : 'Material', \
-	MAT_AMBIENT_COLOR                   : 'Material Ambient Color', \
-	MAT_ANGLE_MAP                       : 'Material Angle Map', \
-	MAT_BUMP_MAP                        : 'Material Bump Map', \
-	MAT_BUMP_PERCENT                    : 'Material Bump Percentage', \
-	MAT_DIFFUSE_COLOR                   : 'Material Diffuse Color', \
-	MAT_DIFFUSE_MAP                     : 'Material Diffuse Map', \
-	MAT_NAME                            : 'Material Name', \
-	MAT_OPACITY_MAP                     : 'Material Opacity Map', \
-	MAT_PHONGSOFT                       : 'Material Phong soft', \
-	MAT_REFLECTION_BLUR_PERCENTAGE      : 'Material Reflection', \
-	MAT_REFLECTION_MAP                  : 'Material Reflection Map', \
-	MAT_SELF_ILLUM_PERCENTAGE           : 'Material Emissive', \
-	MAT_SELF_ILLUM_MAP                  : 'Material Emissive Map', \
-	MAT_SHININESS_PERCENT               : 'Material Shininess', \
-	MAT_SHININESS_STRENGTH_PERCENT      : 'Material Shininess strength', \
-	MAT_SHININESS_MAP                   : 'Material Shininess Map', \
-	MAT_SPECULAR_COLOR                  : 'Material Specular Color', \
-	MAT_TEXTURE_BLUR_MAP                : 'Material Texture Blur Map', \
-	MAT_TEXTURE_NAME                    : 'Material Texture', \
-	MAT_TRANSPARENCY_FALLOFF_PERCENTAGE : 'Material Transparency falloff', \
-	MAT_TRANSPARENCY_PERCENTAGE         : 'Material Transparency', \
-	MAT_WIRESIZE                        : 'Material Wire Size', \
-	MAT_XPFALLIN                        : 'Material XP fallin', \
-	MESH_ANIM                           : 'Mesh-Animation', \
-	MESH_INFO                           : 'Mesh-Info', \
-	MESH_NAME                           : 'Mesh-Name', \
-	MESH_VERSION                        : 'Mesh-Version', \
-	MULTIPLIER                          : 'Multiplier', \
-	NAMED_OBJECT                        : 'Named-Object', \
-	OBJ_LIGHT                           : 'Light', \
-	TRI_MESH_OBJ                        : 'Triang. Mesh', \
-	OMNI_LIGHT_INFO                     : 'Omni-Light-Info', \
-	RANGE_END                           : 'Range stop', \
-	RANGE_START                         : 'Range start', \
-	RENDER_TYPE                         : 'Render Type', \
-	RGB1                                : 'RGB1', \
-	RGB2                                : 'RGB2', \
-	SCALE                               : 'Scale', \
-	SPOT_LIGHT_INFO                     : 'Spot-Light-Info', \
-	SPOT_LIGHT_TARGET_INFO              : 'Target-Spot-Light-Info', \
-	TRK_PIVOT                           : 'Trk. Pivot', \
-	TRK_POSITION                        : 'Trk. Position', \
-	TRK_ROTATION                        : 'Trk. Rotation', \
-	TRK_SCALE                           : 'Trk. Scale', \
-	TRI_PLACEMENT                       : 'Triang. Placement', \
-	TRI_MAPPINGCOORS                    : 'Triang. Mapping-Coordinates', \
-	TRI_MAPPINGSTANDARD                 : 'Triang. Mappmg (def.)', \
-	TRI_MATERIAL                        : 'Triang. Material', \
-	TRI_SMOOTH                          : 'Triang. Smoothing', \
-	TRI_VERTEXL                         : 'Triang. Vertices', \
-	TRI_VERTEXOPTIONS                   : 'Triang. Vertice Options', \
-	TRI_VISIBLE                         : 'Triang. Visible', \
-	TWO_SIDED                           : 'Two Sided', \
-	U_OFFSET                            : 'U-Offset', \
-	U_SCALE                             : 'U-Scale', \
-	VERSION                             : 'Version', \
-	V_OFFSET                            : 'V-Offset', \
-	V_SCALE                             : 'V-Scale', \
+	AMBIENT_COLOR                       : 'Ambient Color',
+	AMBIENT_LIGHT_INFO                  : 'Ambient-Light-Info',
+	ATTENUATED                          : 'Attentuated',
+	BOUNDING_BOX                        : 'Bounding-Box',
+	CAMERA                              : 'Camera',
+	CAMERA_INFO                         : 'Camera-Info',
+	CAMERA_TARGET_INFO                  : 'Camera-Target-Info',
+	CURRENT_FRAME                       : 'Current-Frame',
+	EDITOR                              : 'Editor',
+	FACES_DESCRIPTION                   : 'Faces Description',
+	FRAMES                              : 'Frames',
+	HIERARCHY                           : 'Hierarchy',
+	HIERARCHY_INFO                      : 'Hierarchy-Info',
+	INT_PERCENT                         : 'Int-Percentage',
+	KEYFRAMER                           : 'Keyframer',
+	LIT_OFF                             : 'Off-Light',
+	LIT_SPOT                            : 'Spot-Light',
+	LIT_UNKNWN01                        : 'Unknown-Light',
+	MAIN                                : 'Main 3DS',
+	MAPPING                             : 'Mapping',
+	MATERIAL                            : 'Material',
+	MAT_AMBIENT_COLOR                   : 'Material Ambient Color',
+	MAT_ANGLE_MAP                       : 'Material Angle Map',
+	MAT_BUMP_MAP                        : 'Material Bump Map',
+	MAT_BUMP_PERCENT                    : 'Material Bump Percentage',
+	MAT_DIFFUSE_COLOR                   : 'Material Diffuse Color',
+	MAT_DIFFUSE_MAP                     : 'Material Diffuse Map',
+	MAT_NAME                            : 'Material Name',
+	MAT_OPACITY_MAP                     : 'Material Opacity Map',
+	MAT_PHONGSOFT                       : 'Material Phong soft',
+	MAT_REFLECTION_BLUR_PERCENTAGE      : 'Material Reflection',
+	MAT_REFLECTION_MAP                  : 'Material Reflection Map',
+	MAT_SELF_ILLUM_PERCENTAGE           : 'Material Emissive',
+	MAT_SELF_ILLUM_MAP                  : 'Material Emissive Map',
+	MAT_SHININESS_PERCENT               : 'Material Shininess',
+	MAT_SHININESS_STRENGTH_PERCENT      : 'Material Shininess strength',
+	MAT_SHININESS_MAP                   : 'Material Shininess Map',
+	MAT_SPECULAR_COLOR                  : 'Material Specular Color',
+	MAT_TEXTURE_BLUR_MAP                : 'Material Texture Blur Map',
+	MAT_TEXTURE_NAME                    : 'Material Texture',
+	MAT_TRANSPARENCY_FALLOFF_PERCENTAGE : 'Material Transparency falloff',
+	MAT_TRANSPARENCY_PERCENTAGE         : 'Material Transparency',
+	MAT_WIRESIZE                        : 'Material Wire Size',
+	MAT_XPFALLIN                        : 'Material XP fallin',
+	MESH_ANIM                           : 'Mesh-Animation',
+	MESH_INFO                           : 'Mesh-Info',
+	MESH_NAME                           : 'Mesh-Name',
+	MESH_VERSION                        : 'Mesh-Version',
+	MULTIPLIER                          : 'Multiplier',
+	NAMED_OBJECT                        : 'Named-Object',
+	OBJ_LIGHT                           : 'Light',
+	TRI_MESH_OBJ                        : 'Triang. Mesh',
+	OMNI_LIGHT_INFO                     : 'Omni-Light-Info',
+	RANGE_END                           : 'Range stop',
+	RANGE_START                         : 'Range start',
+	RENDER_TYPE                         : 'Render Type',
+	RGB1                                : 'RGB1',
+	RGB2                                : 'RGB2',
+	SCALE                               : 'Scale',
+	SPOT_LIGHT_INFO                     : 'Spot-Light-Info',
+	SPOT_LIGHT_TARGET_INFO              : 'Target-Spot-Light-Info',
+	TRK_PIVOT                           : 'Trk. Pivot',
+	TRK_POSITION                        : 'Trk. Position',
+	TRK_ROTATION                        : 'Trk. Rotation',
+	TRK_SCALE                           : 'Trk. Scale',
+	TRI_PLACEMENT                       : 'Triang. Placement',
+	TRI_MAPPINGCOORS                    : 'Triang. Mapping-Coordinates',
+	TRI_MAPPINGSTANDARD                 : 'Triang. Mappmg (def.)',
+	TRI_MATERIAL                        : 'Triang. Material',
+	TRI_SMOOTH                          : 'Triang. Smoothing',
+	TRI_VERTEXL                         : 'Triang. Vertices',
+	TRI_VERTEXOPTIONS                   : 'Triang. Vertice Options',
+	TRI_VISIBLE                         : 'Triang. Visible',
+	TWO_SIDED                           : 'Two Sided',
+	U_OFFSET                            : 'U-Offset',
+	U_SCALE                             : 'U-Scale',
+	VERSION                             : 'Version',
+	V_OFFSET                            : 'V-Offset',
+	V_SCALE                             : 'V-Scale',
 }
 
 def getChunkName(chunk):
@@ -188,12 +190,13 @@ def getData(chunk, id):
 	return None
 
 def getSplineTerms(accelerationData, chopper):
+	spline = {}
 	bits = accelerationData
-	spline = []
 	for i in range(5):
 		bits >>= i
 		if ((bits & 1) == 1):
-			x = chopper.getFloat()
+			spline[i] = chopper.getFloat()
+	return  spline
 
 def _dotchain(first, *rest):
 	matrix = first
@@ -213,21 +216,25 @@ class AbstractChunk():
 		self.data        = []
 		self.subChunks   = {}
 	def __str__(self): return "%s" % (getChunkName(self))
-
 	def addSubChunk(self, subId, subChunk):
 		if (subId not in self.subChunks):
 			self.subChunks[subId] = []
 		chunkStack = self.subChunks[subId]
 		chunkStack.append(subChunk)
 		subChunk.parent = self
-
 	def getSubChunk(self, id):
-		if (id in self.subChunks):
-			chunkStack = self.subChunks[id]
-			if (len(chunkStack) > 0):
-				return chunkStack[len(chunkStack) - 1]
+		chunkStack = self.getSubChunks(id)
+		if (chunkStack): return chunkStack[len(chunkStack) - 1]
 		return None
-
+	def getSubChunkData(self, id):
+		child = self.getSubChunk(id)
+		if (child):
+			return child.data
+		return None
+	def getSubChunks(self, id):
+		if (id in self.subChunks):
+			return self.subChunks[id]
+		return None
 	def loadData(self, chopper): return #self.data = chopper.getChunkBytes()
 	def initialize(self, chopper): return # Nothing to do here!
 
@@ -241,7 +248,6 @@ class EditorChunk(AbstractChunk):
 
 class FacesDescriptionChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
-
 	def loadData(self, chopper):
 		numFaces = chopper.getUnsignedShort()
 		if (self.len >= 0xF6FBF): numFaces |= 0x10000
@@ -253,6 +259,19 @@ class FacesDescriptionChunk(AbstractChunk):
 			c = chopper.getUnsignedShort()
 			d = chopper.getUnsignedShort()
 			self.data.append([a, c, b, d])
+	def createShape(self, chopper, face, mtx, name, pts):
+		# translate the points according to the transformation matrix
+		pt = numpy.ones((len(pts), 4), numpy.float32)
+		pt[:,:3] = pts
+		tpt = numpy.transpose(numpy.dot(mtx, numpy.transpose(pt)))
+
+		data = []
+		for idx in self.data:
+			data.append([tpt[idx[0]], tpt[idx[1]], tpt[idx[2]]])
+
+		obj = newObject(chopper.tg, name, data)
+		chopper.adjustMaterial(obj, face)
+		return
 
 class FacesMaterialChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
@@ -290,10 +309,19 @@ class CurrentFrameChunk(AbstractChunk):
 	def loadData(self, chopper): self.data = chopper.getInt()
 	def initialize(self, chopper): chopper.currentFrame = self.data
 
-class IntPercentChunk(AbstractChunk):
+class PercentageChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
 	def __str__(self): return "%s: %s%%" % (getChunkName(self), self.data)
-	def loadData(self, chopper): self.data = chopper.getShort() * 0.01
+	def loadData(self, chopper):
+		t = chopper.getUnsignedShort()
+		l = chopper.getUnsignedInt()
+		if (t == ord('0')):
+			self.data = chopper.getUnsignedShort() * 0.01
+		elif (t == ord('1')):
+			self.data = chopper.getFloat() * 0.01
+		else:
+			b = chopper.getChunkBytes()
+			raise Exception("Don't know how to handle percentage type '%s'=%s" %(chr(t), " ".join(["%02X" %(c) for c in b])))
 
 class MainChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
@@ -335,66 +363,49 @@ class MeshInfoChunk(AbstractChunk):
 	def initialize(self, chopper):
 		hi = self.getSubChunk(HIERARCHY_INFO) # build up tree!
 		hrx = self.getSubChunk(HIERARCHY)
-		FreeCAD.Console.PrintMessage("Adding '%s'\n" %(hrx.name))
-		#mtx = self.createKeyMatrix(chopper.currentFrame)
+#		FreeCAD.Console.PrintMessage("Adding '%s'\n" %(hrx.name))
+		# mtx = self.createKeyMatrix(chopper.currentFrame)
 		mtx = self.createKeyMatrix(0)
-		parent = chopper.keyMatrix.get(hrx.getParentId())
+		parent = chopper.meshInfo.get(hrx.getParentId())
 		if (parent is not None):
 			prnMtx = parent.matrix
 			if (prnMtx is not None):
 				mtx = mtx.dot(prnMtx)
 		self.matrix = mtx
-		chopper.keyMatrix[hi.data] = self
+		chopper.meshInfo[hi.data] = self
 		nObj = chopper.namedObjectes.get(hrx.name)
 		if (nObj):
 			mObj = nObj.getSubChunk(TRI_MESH_OBJ)
 			if (mObj):
-				pts = getData(mObj, TRI_VERTEXL)          # the 3D-point coordinates         => Vertex3ListChunk
 				dsc = mObj.getSubChunk(FACES_DESCRIPTION) # the 3D object faces              => FacesDescriptionChunk
 				if (dsc):
-					mat = dsc.getSubChunk(TRI_MATERIAL)
-
-					plc = mObj.getSubChunk(TRI_PLACEMENT) # the 3D object faces              => PlacementChunk
-					mtx = numpy.dot(plc.getMatrix(), mtx)
-
-					# translate the points according to the transformation matrix
-					pt = numpy.ones((len(pts), 4), numpy.float32)
-					pt[:,:3] = pts
-					tpt = numpy.transpose(numpy.dot(mtx, numpy.transpose(pt)))
-
-					data = []
-					for idx in dsc.data:
-						data.append([tpt[idx[0]], tpt[idx[1]], tpt[idx[2]]])
-
-					obj = newObject(chopper.tg, hrx.name, data)
-					chopper.adjustMaterial(obj, mat)
+					faces = dsc.getSubChunks(TRI_MATERIAL)
+					if (faces):
+						plc = mObj.getSubChunk(TRI_PLACEMENT) # the 3D object faces              => PlacementChunk
+						mtx = numpy.dot(plc.getMatrix(), mtx)
+						for face in faces:
+							points = face.getSubChunkData(TRI_VERTEXL)          # the 3D-point coordinates         => Vertex3ListChunk
+							dsc.createShape(chopper, face, mtx, face.name, points)
 
 class NamedObjectChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
 	def loadData(self, chopper): self.name = chopper.getString()
-	def initialize(self, chopper): chopper.namedObjectes[self.name] = self
+	def initialize(self, chopper):
+		chopper.namedObjectes[self.name] = self
+		mObj = self.getSubChunk(TRI_MESH_OBJ)
+		if (mObj):
+			dsc = mObj.getSubChunk(FACES_DESCRIPTION)
+			if (dsc):
+				faces = dsc.getSubChunks(TRI_MATERIAL)
+				if (faces):
+					plc = mObj.getSubChunk(TRI_PLACEMENT) # the 3D object faces              => PlacementChunk
+					mtx = plc.getMatrix()
+					points = mObj.getSubChunkData(TRI_VERTEXL)
+					for face in faces:
+						dsc.createShape(chopper, face, mtx, self.name, points)
 
 class NTriObjectChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
-
-class PercentageChunk(AbstractChunk):
-	INT   = 0x30
-	FLOAT = 0x31
-	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
-	def __str__(self): return "%s: %s%%" %(getChunkName(self), self.data)
-	def loadData(self, chopper):
-		percentageType = chopper.getUnsignedShort()
-		percentageLength = chopper.getInt()
-
-		if (percentageType == PercentageChunk.INT):
-			self.data = chopper.getUnsignedShort() * 0.01
-		elif (percentageType == PercentageChunk.FLOAT):
-			self.percentage = chopper.getFloat() * 0.01
-
-class PercentageIntChunk(AbstractChunk):
-	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
-	def __str__(self): return "%s: %s%%" %(getChunkName(self), self.data)
-	def loadData(self, chopper): self.data = chopper.getUnsignedShort() * 0.01
 
 class PlacementChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
@@ -427,48 +438,37 @@ class PlacementChunk(AbstractChunk):
 			[self.data[0x8], self.data[0x9], self.data[0xA], self.data[0xB]], \
 			[0, 0, 0, 1]], numpy.float32)
 
-class Rgb1Chunk(AbstractChunk):
-	FLOAT_COLOR       = 0x0010
-	BYTE_COLOR        = 0x0011
-	BYTE_COLOR_GAMMA  = 0x0012
-	FLOAT_COLOR_GAMMA = 0x0013
+class ColorChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
 	def __str__(self): return "%s: R=%g,G=%g,B=%g" %(getChunkName(self), self.data[0], self.data[1], self.data[2])
 	def loadData(self, chopper):
 		colorType = chopper.getUnsignedShort() # SubChunkId represents Color type.
 		l = chopper.getInt()     # skip length.
 		a = 1.0
-		if (colorType == Rgb1Chunk.BYTE_COLOR):
-			r = chopper.getUnsignedByte() / 255.0
-			g = chopper.getUnsignedByte() / 255.0
-			b = chopper.getUnsignedByte() / 255.0
-		elif (colorType == Rgb1Chunk.BYTE_COLOR_GAMMA):
-			r = chopper.getUnsignedByte() / 255.0
-			g = chopper.getUnsignedByte() / 255.0
-			b = chopper.getUnsignedByte() / 255.0
-			a = chopper.getUnsignedByte() / 255.0
-		elif (colorType == Rgb1Chunk.FLOAT_COLOR):
+		if (colorType == 0x10): # rgb as float values 0.0 ... 1.0
 			r = chopper.getFloat()
 			g = chopper.getFloat()
 			b = chopper.getFloat()
-		elif (colorType == Rgb1Chunk.FLOAT_COLOR_GAMMA):
+		elif (colorType == 0x11): # rgb as float values 0 .. 255
+			r = chopper.getUnsignedByte() / 255.0
+			g = chopper.getUnsignedByte() / 255.0
+			b = chopper.getUnsignedByte() / 255.0
+		elif (colorType == 0x12): # rgb as float values 0 .. 255 (incl. gamma correction)
+			r = chopper.getUnsignedByte() / 255.0
+			g = chopper.getUnsignedByte() / 255.0
+			b = chopper.getUnsignedByte() / 255.0
+		elif (colorType == 0x13): # rgb as float values 0.0 ... 1.0 (incl. gamma correction)
 			r = chopper.getFloat()
 			g = chopper.getFloat()
 			b = chopper.getFloat()
 			a = chopper.getFloat()
 		else:
-			FreeCAD.PrintError("Only RGB colors are enabled! Color type = %X, len = %d" %(colorType, self.len))
-			r = l / 32767.0
-			g = chopper.getInt() / 32767.0
-			b = chopper.getUnsignedShort() / 32767.0
+			b = chopper.getChunkBytes()
+			FreeCAD.PrintError("Only RGB colors are enabled! Color type = %X: %s" %(colorType, " ".join(["%02X" %(c) for c in b])))
+			r = 0.5
+			g = 0.5
+			b = 0.5
 		self.data = (r, g, b, a)
-
-class Rgb2Chunk(AbstractChunk):
-	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
-	def __str__(self): return "%s: %s" % (getChunkName(self), self.data)
-	def loadData(self, chopper):
-		rgb = bytearray(chopper.getChunkBytes())
-		self.data = (rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0)
 
 class TrkPivotChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
@@ -499,14 +499,9 @@ class TrkPositionChunk(AbstractChunk):
 		for i in range(numKeys):
 			frm = chopper.getInt()
 			flg = chopper.getUnsignedShort()
-			tcb = {}
-			if (flg & TrkPositionChunk.USE_TENSION):    tcb['tens']      = chopper.getFloat()
-			if (flg & TrkPositionChunk.USE_CONTINUITY): tcb['cont']      = chopper.getFloat()
-			if (flg & TrkPositionChunk.USE_BIAS):       tcb['bias']      = chopper.getFloat()
-			if (flg & TrkPositionChunk.USE_EASE_TO):    tcb['ease_to']   = chopper.getFloat()
-			if (flg & TrkPositionChunk.USE_EASE_FROM):  tcb['ease_from'] = chopper.getFloat()
+			tcb = chopper.getFloat()
 			pnt = chopper.getPoint3f()
-			self.data.append([frm, tcb, pnt])
+			self.data.append([frm, flg, tcb, pnt])
 	def getMatrix(self, frame = 0):
 		mtx = numpy.identity(4,numpy.float32)
 		pos = self.data[frame][2]
@@ -581,7 +576,9 @@ class SkipChunk(AbstractChunk):
 class StringChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
 	def __str__(self): return "%s: '%s'" % (getChunkName(self), self.data)
-	def loadData(self, chopper): self.data = chopper.getString()
+	def loadData(self, chopper):
+		self.data = chopper.getString()
+		chopper.getChunkBytes() # skip allignment bytes
 
 class Vertex2ListChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
@@ -593,31 +590,31 @@ class Vertex2ListChunk(AbstractChunk):
 class Vertex3ListChunk(AbstractChunk):
 	def __init__(self, id, l): AbstractChunk.__init__(self, id, l)
 	def loadData(self, chopper):
-		cnt = chopper.getUnsignedShort()
-		self.data = numpy.zeros((cnt, 3), numpy.float32)
-		for i in xrange(cnt):
+		numVertices = chopper.getUnsignedShort()
+		self.data = numpy.zeros((numVertices, 3), numpy.float32)
+		for i in range(numVertices):
 			self.data[i,0:3] = chopper.getPoint3f()
 
 class Importer:
 	def __init__(self, doc, filename):
 		self.constructors = {}
-		self.constructors[AMBIENT_COLOR] = Rgb1Chunk
-		self.constructors[COLOR] = Rgb1Chunk
+		self.constructors[AMBIENT_COLOR] = ColorChunk
+		self.constructors[COLOR] = ColorChunk
 		self.constructors[EDITOR] = EditorChunk
 		self.constructors[FACES_DESCRIPTION] = FacesDescriptionChunk
 		self.constructors[HIERARCHY] = HierarchyChunk
 		self.constructors[HIERARCHY_INFO] = HierarchyInfoChunk
-		self.constructors[INT_PERCENT] = IntPercentChunk
+		self.constructors[INT_PERCENT] = PercentageChunk
 		self.constructors[MAIN] = MainChunk
 		self.constructors[MATERIAL] = MaterialChunk
-		self.constructors[MAT_AMBIENT_COLOR] = Rgb1Chunk
-		self.constructors[MAT_BUMP_PERCENT] = PercentageIntChunk
-		self.constructors[MAT_DIFFUSE_COLOR] = Rgb1Chunk
+		self.constructors[MAT_AMBIENT_COLOR] = ColorChunk
+		self.constructors[MAT_BUMP_PERCENT] = PercentageChunk
+		self.constructors[MAT_DIFFUSE_COLOR] = ColorChunk
 		self.constructors[MAT_NAME] = StringChunk
 		self.constructors[MAT_REFLECTION_BLUR_PERCENTAGE] = PercentageChunk
 		self.constructors[MAT_SHININESS_PERCENT] = PercentageChunk
 		self.constructors[MAT_SHININESS_STRENGTH_PERCENT] = PercentageChunk
-		self.constructors[MAT_SPECULAR_COLOR] = Rgb1Chunk
+		self.constructors[MAT_SPECULAR_COLOR] = ColorChunk
 		self.constructors[MAT_TEXTURE_NAME] = StringChunk
 		self.constructors[MAT_TRANSPARENCY_FALLOFF_PERCENTAGE] = PercentageChunk
 		self.constructors[MAT_TRANSPARENCY_PERCENTAGE] = PercentageChunk
@@ -630,8 +627,6 @@ class Importer:
 		self.constructors[TRI_MESH_OBJ] = NTriObjectChunk
 		self.constructors[RANGE_END] = FloatChunk
 		self.constructors[RANGE_START] = FloatChunk
-		self.constructors[RGB1] = Rgb1Chunk
-		self.constructors[RGB2] = Rgb2Chunk
 		self.constructors[SCALE] = FloatChunk
 		self.constructors[TRK_PIVOT] = TrkPivotChunk
 		self.constructors[TRK_SCALE] = TrkScaleChunk
@@ -652,14 +647,15 @@ class Importer:
 		self.currentFrame = 0
 		self.materials = {}
 		self.namedObjectes = {}
-		self.keyMatrix = {}
+		self.meshInfo = {}
 
 	def close(self): self.file.close()
 
 	def getUnsignedByte(self):      return ord(self.file.read(1))
 	def getUnsignedShort(self):     return unpack('<H', self.file.read(2))[0]
+	def getUnsignedInt(self):       return unpack('<L', self.file.read(4))[0]
 	def getShort(self):             return unpack('<h', self.file.read(2))[0]
-	def getInt(self):		        return unpack('<L', self.file.read(4))[0]
+	def getInt(self):               return unpack('<l', self.file.read(4))[0]
 	def getFloat(self):             return unpack('<f', self.file.read(4))[0]
 	def getPoint2f(self):           return unpack('<ff', self.file.read(8))
 	def getPoint3f(self):           return unpack('<fff', self.file.read(12))
@@ -670,9 +666,9 @@ class Importer:
 		buf = bytearray()
 		while True:
 			b = self.file.read(1)
-			if b is None or b == '\0':
-				return str(buf)
-			buf.append(b)
+			if b is None or b == b'\x00':
+				return buf.decode('utf8')
+			buf += b
 
 	def createChunk(self, id, l):
 		if (id in self.constructors):
@@ -728,7 +724,7 @@ class Importer:
 				obj.ViewObject.ShapeMaterial.Shininess     = material.get('shinines', 0.2)
 				obj.ViewObject.ShapeMaterial.Transparency  = material.get('transparency', 0.0)
 			else:
-				FreeCAD.Console.PrintError("Can't find material '%s'!\n" %(name))
+				FreeCAD.Console.PrintError("Can't find material '%s'!\n" %(mat.name))
 
 def read(doc, filename):
 	reader = Importer(doc, filename)
