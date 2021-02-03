@@ -9,6 +9,13 @@ import re, Mesh, FreeCAD, struct
 INVALID_NAME = re.compile('^[0-9].*')
 
 _can_import  = True
+BIG_ENDIAN = '>'
+LITTLE_ENDIAN = '<'
+ENDIANNESS = BIG_ENDIAN
+
+def setEndianess(endianess):
+	global ENDIANNESS
+	ENDIANNESS = endianess
 
 def setCanImport(canImport):
 	global _can_import
@@ -28,8 +35,8 @@ def missingDependency(module):
 	setCanImport(False)
 
 def getValidName(name):
-	if (INVALID_NAME.match(name)): return '_' + name.encode('utf8')
-	return name.encode('utf8')
+	if (INVALID_NAME.match(name)): return "_%s"%(name.encode('utf8'))
+	return "%s"%(name.encode('utf8'))
 
 def newObject(doc, name, data):
 	obj = doc.addObject('Mesh::Feature', getValidName(name))
@@ -50,12 +57,12 @@ def newGroup(parent, name):
 
 def _get(data, fmt, size, offset):
 	end = offset + size
-	value, = struct.unpack('<' + fmt, data[offset:end])
+	value, = struct.unpack(ENDIANNESS + fmt, data[offset:end])
 	return value, end
 
 def _gets(data, fmt, size, offset, count):
 	end = offset + (count * size)
-	values = struct.unpack('<' + fmt*count, data[offset:end])
+	values = struct.unpack(ENDIANNESS + fmt*count, data[offset:end])
 	return values, end
 
 def getLong(data, offset):  return _get(data, 'q', 8, offset)

@@ -26,8 +26,12 @@ http://static.lightwave3d.com/sdk/11-6/html/filefmts/lwo2.html
 #     Made edge creation safer.
 # 1.0 (Ken9) First Release
 
-import os, struct, chunk, traceback, FreeCAD, importUtils, triangulate
-from importUtils import getShort, getFloats, getFloat, newObject, newGroup
+import os, struct, chunk, traceback, FreeCAD, importUtils, Part
+from importUtils import getBytes, getShort, getShorts, getFloat, getFloats, newObject, newGroup, setEndianess, BIG_ENDIAN
+from itertools import groupby
+from triangulate import getTriangles
+
+V = FreeCAD.Vector
 class Layer(object):
 	def __init__(self):
 		self.name      = ""
@@ -42,7 +46,7 @@ class Layer(object):
 class Material(object):
 	def __init__(self):
 		self.name   = "Default"
-		self.colr   = [1.0, 1.0, 1.0]
+		self.colr   = (1.0, 1.0, 1.0)
 		self.diff   = 1.0   # Diffuse
 		self.lumi   = 0.0   # Luminosity
 		self.spec   = 0.0   # Specular
@@ -63,14 +67,15 @@ def read(doc, filename):
 	file = open(filename, 'rb')
 
 	try:
+		setEndianess(BIG_ENDIAN)
 		header, chunk_size, chunk_name = struct.unpack(">4s1L4s", file.read(12))
 		layers = {}
 		surfs  = {}
 		tags   = []
 		# Gather the object data using the version specific handler.
-		if chunk_name == b'LWOB' or chunk_name == b'LWLO':
+		if chunk_name in (b'LWOB', b'LWLO'):
 			FreeCAD.Console.PrintMessage("Importing LWO v1: %s\n" %(filename))
-			readLwob(file, filename, layers, surfs, tags)
+			readLwo1(file, filename, layers, surfs, tags)
 		elif chunk_name == b'LWO2':
 			FreeCAD.Console.PrintMessage("Importing LWO v2: %s\n" %(filename))
 			readLwo2(file, filename, layers, surfs, tags)
@@ -93,7 +98,7 @@ def read(doc, filename):
 		file.close()
 	return
 
-def readLwob(file, filename, layers, surfs, tags):
+def readLwo1(file, filename, layers, surfs, tags):
 	'''
 	Read version 1 file, LW < 6.
 	'''
@@ -158,24 +163,20 @@ def readLwo2(file, filename, layers, surfs, tags):
 		elif rootchunk.chunkname == b'POLS':
 			sub_type = rootchunk.read(4)
 			# PTCH is LW's Subpatches, SUBD is CatmullClark.
-			if (sub_type == b'FACE' or sub_type == b'PTCH' or sub_type == b'SUBD'):
+			if (sub_type in (b'FACE', b'PTCH', b'SUBD')):
 				last_pols_count = readPols2(rootchunk.read(), layer)
 				if sub_type == b'FACE':
 					layer.has_subds = True
-#			else:
-#				FreeCAD.Console.PrintMessage("	Skipping POLS.%s\n" % sub_type)
 				rootchunk.skip()
 		elif rootchunk.chunkname == b'PTAG':
 			sub_type, = struct.unpack("4s", rootchunk.read(4))
 			if sub_type == b'SURF':
 				readSurfTags(rootchunk.read(), layer, last_pols_count)
-#			else:
-#				FreeCAD.Console.PrintMessage("	Skipping PTAG.%s\n" % sub_type)
+			else:
 				rootchunk.skip()
 		elif rootchunk.chunkname == b'SURF':
 			readSurf2(rootchunk.read(), surfs)
-#		else:
-#			FreeCAD.Console.PrintMessage("  Skipping %s\n" % rootchunk.chunkname)
+		else:
 			rootchunk.skip()
 
 def readString(raw_name):
@@ -281,7 +282,7 @@ def readPoints(pnt_bytes, layer):
 def readPols1(pols, layer):
 	'''
 	Read the polygons, each one is just a list of point indexes.
-	But it also includes the surface index.
+	But it also includes the surface index (sid).
 	'''
 #	FreeCAD.Console.PrintMessage("  Reading Layer Polygons\n")
 	pol_bytes = bytearray(pols)
@@ -292,11 +293,7 @@ def readPols1(pols, layer):
 
 	while offset < chunk_len:
 		pnts_count, offset = getShort(pol_bytes, offset)
-		all_face_pnts = []
-		for j in range(pnts_count):
-			face_pnt, offset = getShort(pol_bytes, offset)
-			all_face_pnts.append(face_pnt)
-
+		all_face_pnts, offset = getShorts(pol_bytes, offset, pnts_count)
 		layer.pols.append(all_face_pnts)
 		sid, offset = getShort(pol_bytes, offset)
 		sid = abs(sid) - 1
@@ -368,32 +365,32 @@ def readSurf1(surf_bytes, objMaterials):
 
 		# Now test which subchunk it is.
 		if subchunk_name == b'COLR':
-			color, offset= getBytes(surf_bytes, offset, 4)
-			surf.colr = [color[0] / 255.0, color[1] / 255.0, color[2] / 255.0]
+			color, dummy= getBytes(surf_bytes, offset, 4)
+			surf.colr = (color[0] / 255.0, color[1] / 255.0, color[2] / 255.0)
 		elif subchunk_name == b'DIFF':
-			surf.diff, offset = getShort(surf_bytes, offset)
+			surf.diff, dummy = getShort(surf_bytes, offset)
 			surf.diff /= 256.0	# Yes, 256 not 255.
 		elif subchunk_name == b'LUMI':
-			surf.lumi, offset = getShort(surf_bytes, offset)
+			surf.lumi, dummy = getShort(surf_bytes, offset)
 			surf.lumi /= 256.0
 		elif subchunk_name == b'SPEC':
-			surf.spec, offset = getShort(surf_bytes, offset)
+			surf.spec, dummy = getShort(surf_bytes, offset)
 			surf.spec /= 256.0
 		elif subchunk_name == b'REFL':
-			surf.refl, offset = getShort(surf_bytes, offset)
+			surf.refl, dummy = getShort(surf_bytes, offset)
 			surf.refl /= 256.0
 		elif subchunk_name == b'TRAN':
-			surf.tran, offset = getShort(surf_bytes, offset)
+			surf.tran, dummy = getShort(surf_bytes, offset)
 			surf.tran /= 256.0
 		elif subchunk_name == b'RIND':
-			surf.rind, offset = getShort(surf_bytes, offset)
+			surf.rind, dummy = getShort(surf_bytes, offset)
 		elif subchunk_name == b'GLOS':
-			surf.glos, offset = getShort(surf_bytes, offset)
+			surf.glos, dummy = getShort(surf_bytes, offset)
 		elif subchunk_name == b'SMAN':
-			s_angle, offset = getFloat(surf_bytes, offset)
+			s_angle, dummy = getFloat(surf_bytes, offset)
 			if s_angle > 0.0:
 				surf.smooth = True
-
+		# skip remaining bytes of sub-chunk...
 		offset += subchunk_len
 
 	objMaterials[surf.name] = surf
@@ -402,9 +399,6 @@ def readSurf2(surf_bytes, objMaterials):
 	'''
 	Read the object's surface data.
 	'''
-#	if len(objMaterials) == 0:
-#		FreeCAD.Console.PrintMessage("Reading Object Surfaces\n")
-
 	surf = Material()
 	name, name_len = readString(surf_bytes)
 	if len(name) != 0:
@@ -420,7 +414,9 @@ def readSurf2(surf_bytes, objMaterials):
 		subchunk_len, offset = getShort(surf_bytes, offset)
 
 		# Now test which subchunk it is.
-		if subchunk_name == b'COLR':   surf.colr, dummy = getFloats(surf_bytes, offset, 3)
+		if subchunk_name == b'COLR':
+			c, dummy = getFloats(surf_bytes, offset, 3)
+			surf.colr = tuple(c)
 		elif subchunk_name == b'DIFF': surf.diff, dummy = getFloat(surf_bytes, offset)
 		elif subchunk_name == b'LUMI': surf.lumi, dummy = getFloat(surf_bytes, offset)
 		elif subchunk_name == b'SPEC': surf.spec, dummy = getFloat(surf_bytes, offset)
@@ -443,14 +439,38 @@ def readSurf2(surf_bytes, objMaterials):
 def buildObject(doc, parent, layer, objMaterials, objTags):
 	FreeCAD.Console.PrintMessage("Building mesh '%s'...\n" %(layer.name))
 	data = []
-	for pol in layer.pols:
-		if len(pol) > 2:# skip points and lines!
-			ngon = [layer.pnts[idx] for idx in pol]
-			try:
-				for triangle in triangulate.getTriangles(ngon):
-					data.append(triangle)
-			except:
-				FreeCAD.Console.PrintWarning("   skipping polygon that is too small:%s\n"%(ngon))
+	mfacets = []
+	if (layer.pols):
+		for pol in layer.pols:
+			if len(pol) > 2:
+				ngon = [layer.pnts[idx] for idx in pol]
+				if (len(pol)>3):
+					points = [V(k) for k in ngon]
+					points.append(points[0])
+					wire = Part.makePolygon(points)
+					try:
+						face = Part.Face(wire)
+						tris = face.tessellate(1)
+						for tri in tris[1]:
+							data.append([tris[0][i] for i in tri])
+					except:
+						try:
+							triangles = getTriangles(ngon)
+							for triangle in triangles:
+								data.append(triangle)
+						except ValueError as e:
+							FreeCAD.Console.PrintWarning("   skipping polygon (%s): %s\n"%(e, ngon))
+				else:
+					data.append(ngon)
+#				ngon = [i[0] for i in groupby(ngon)]
+#				if (ngon[0] == ngon[-1]):
+#					ngon = ngon[:-1]
+#				try:
+#					triangles = getTriangles(ngon)
+#					for triangle in triangles:
+#						data.append(triangle)
+#				except ValueError as e:
+#					FreeCAD.Console.PrintWarning("   skipping polygon (%s): %s\n"%(e, ngon))
 
 	me = newObject(doc, layer.name, data)
 	me.Placement.Base = FreeCAD.Vector(layer.pivot)
@@ -460,7 +480,7 @@ def buildObject(doc, parent, layer, objMaterials, objTags):
 		if objTags[surf_key] in objMaterials:
 			material = objMaterials[objTags[surf_key]]
 #			me.ViewObject.ShapeMaterial.AmbientColor  =
-			me.ViewObject.ShapeMaterial.DiffuseColor  = material.colr[:]
+			me.ViewObject.ShapeMaterial.DiffuseColor  = material.colr
 #			me.ViewObject.ShapeMaterial.EmissiveColor =
 #			me.ViewObject.ShapeMaterial.SpecularColor =
 			me.ViewObject.ShapeMaterial.Shininess     = material.lumi
@@ -484,11 +504,6 @@ def buildObjects(doc, layers, objMaterials, objTags):
 	Using the gathered data, create the objects.
 	'''
 	for key,layer in layers.items():
-		# check hierarchy
-		#if (len(layer.subds) > 0):
 		if (layer.parentIdx is None):
 			buildObject(doc, None, layer, objMaterials, objTags)
 	FreeCAD.Console.PrintMessage("Done Importing LWO File\n")
-
-if __name__ == '__main__':
-	read(FreeCAD.ActiveDocument, 'D:/Workspace/python/3D/pontez/pontez.lwo')
