@@ -203,7 +203,7 @@ class ChunkReader():
 			old = offset
 			offset, chunk = self.getNextChunk(data, offset, level, len(chunks), containerReader, primitiveReader)
 			if (level==0):
-				for i in xrange(offset - old):
+				for i in range(offset - old):
 					progressbar.next()
 			chunks.append(chunk)
 
@@ -747,7 +747,7 @@ def createEditablePoly(doc, shape, msh, mat, mtx):
 
 #		if (len(indexList) > 0):
 #			FreeCAD.Console.PrintMessage(" %s " %(str(indexList)))
-#			for i in xrange(len(indexList)):
+#			for i in range(len(indexList)):
 #				created |= createShape3d(doc, coords, indicesList[i],  shape, indexList[i], mtx, mat)
 #		elif (point4i is not None):
 		if (point4i is not None):
@@ -909,7 +909,7 @@ def createChamferBox(doc, shape, box, mat, mtx):
 #	adjustPlacement(cube, mtx)
 #	chmfr.Base = cube
 #	myEdges = []
-#	for i in xrange(12):
+#	for i in range(12):
 #		myEdges.append(( i+1, fillet, fillet)) # (edge number, chamfer start length, chamfer end length)
 #	chmfr.Edges = myEdges
 #	cube.ViewObject.Visibility = False

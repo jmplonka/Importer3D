@@ -1,0 +1,591 @@
+0000H 	NULL_CHUNK
+0001H 	Unknown chunk	float ???
+0002H 	M3D_VERSION	short version;
+0005H 	M3D_KFVERSION	
+0010H 	COLOR_F	float red, grn, blu;
+0011H 	COLOR_24	char red, grn, blu;
+0012H 	LIN_COLOR_24	char red, grn, blu;
+0013H 	LIN_COLOR_F	float red, grn, blu;
+0030H 	INT_PERCENTAGE	short percentage;
+0031H 	FLOAT_PERCENTAGE	float percentage;
+0100H 	MASTER_SCALE	float scale;
+0995H 	ChunkType
+0996H 	ChunkUnique
+0997H 	NotChunk
+0998H 	Container
+0999H 	IsChunk
+0c3cH 	C_SXP_SELFI_MASKDATA	1xxxH Group
+1100H 	BIT_MAP	cstr filename;
+1101H 	USE_BIT_MAP
+1200H 	SOLID_BGND; followed by color_f
+1201H 	USE_SOLID_BGND
+1300H 	V_GRADIENT	followed by three color_f: start, mid, end float midpoint; 	
+1301H 	USE_V_GRADIENT
+1400H 	LO_SHADOW_BIAS	float bias;
+1410H 	HI_SHADOW_BIAS
+1420H 	SHADOW_MAP_SIZE	short size;
+1430H 	SHADOW_SAMPLES
+1440H 	SHADOW_RANGE
+1450H 	SHADOW_FILTER	float filter;
+1460H 	RAY_BIAS	float bias;
+1500H 	O_CONSTS	float plane_x, plane_y, plane_z;
+2100H 	AMBIENT_LIGHT
+2200H 	FOG	followed by color_f, fog_bgnd; float near_plane, near_density; float far_plane, far_density;
+2201H 	USE_FOG
+2210H 	FOG_BGND
+2300H 	DISTANCE_CUE followed by dcue_bgnd;float near_plane, near_density; float far_plane, far_density;
+2301H 	USE_DISTANCE_CUE
+2302H 	LAYER_FOG	float fog_z_from, fog_z_to;	float fog_density;	short fog_type;
+2303H 	USE_LAYER_FOG
+2310H 	DCUE_BGND
+2d2dH 	SMAGIC
+2d3dH 	LMAGIC
+3000H 	DEFAULT_VIEW
+3010H 	VIEW_TOP	float targe_x, target_y, target_z; float view_width;
+3020H 	VIEW_BOTTOM	float targe_x, target_y, target_z; float view_width;
+3030H 	VIEW_LEFT	float targe_x, target_y, target_z; float view_width;
+3040H 	VIEW_RIGHT	float targe_x, target_y, target_z; float view_width;
+3050H 	VIEW_FRONT	float targe_x, target_y, target_z; float view_width;
+3060H 	VIEW_BACK	float targe_x, target_y, target_z; float view_width;
+3070H 	VIEW_USER	float targe_x, target_y, target_z; float view_width;
+3080H 	VIEW_CAMERA	cstr camera_name;
+3090H 	VIEW_WINDOW
+3d3dH 	MDATA; Mesh Data Magic Number (.3DS files sub of 4d4d)
+3d3eH 	MESH_VERSION
+3daaH 	MLIBMAGIC; Material Library Magic Number (.MLI files)
+3dc2H 	PRJMAGIC; 3dS Project Magic Number (.PRJ files)
+3dffH 	MATMAGIC; Material File Magic Number (.MAT files)
+4000H 	NAMED_OBJECT	cstr name;
+4010H 	OBJ_HIDDEN
+4011H 	OBJ_VIS_LOFTER
+4012H 	OBJ_DOESNT_CAST
+4013H 	OBJ_MATTE
+4014H 	OBJ_FAST
+4015H 	OBJ_PROCEDURAL
+4016H 	OBJ_FROZEN
+4017H 	OBJ_DONT_RCVSHADOW
+4100H 	N_TRI_OBJECT	named triangle object; followed by point_array, point_flag_array, mesh_matrix, face_array
+4110H 	POINT_ARRAY	short npoints; struct {float x, y, z;} points[npoints];
+4111H 	POINT_FLAG_ARRAY	short nflags; short flags[nflags];
+4120H 	FACE_ARRAY may be followed by smooth_group	short nfaces; struct {short vertex1, vertex2, vertex3; short flags;} facearray[nfaces];
+4130H 	MSH_MAT_GROUP mesh_material_group	cstr material_name; short nfaces; short facenum[nfaces];
+4131H 	OLD_MAT_GROUP
+4140H 	TEX_VERTS	short nverts; struct {float x, y;} vertices[nverts];
+4150H 	SMOOTH_GROUP	short grouplist[n]; determined by length, seems to be 4 per face
+4160H 	MESH_MATRIX	float matrix[4][3];
+4165H 	MESH_COLOR	short color_index;
+4170H 	MESH_TEXTURE_INFO	short map_type; float x_tiling, y_tiling; float icon_x, icon_y, icon_z; float matrix[4][3]; float scaling, plan_icon_w, plan_icon_h, cyl_icon_h;
+4181H 	PROC_NAME
+4182H 	PROC_DATA
+4190H 	MSH_BOXMAP
+4400H 	N_D_L_OLD
+4500H 	N_CAM_OLD
+4600H 	N_DIRECT_LIGHT; followed by color_f	float x, y, z;
+4610H 	DL_SPOTLIGHT	float target_x, target_y, target_z; float hotspot_ang; float falloff_ang;
+4620H 	DL_OFF
+4625H 	DL_ATTENUATE
+4627H 	DL_RAYSHAD
+4630H 	DL_SHADOWED
+4640H 	DL_LOCAL_SHADOW
+4641H 	DL_LOCAL_SHADOW2
+4650H 	DL_SEE_CONE
+4651H 	DL_SPOT_RECTANGULAR
+4652H 	DL_SPOT_OVERSHOOT
+4653H 	DL_SPOT_PROJECTOR
+4654H 	DL_EXCLUDE
+4655H 	DL_RANGE
+4656H 	DL_SPOT_ROLL	float roll_ang;
+4657H 	DL_SPOT_ASPECT
+4658H 	DL_RAY_BIAS	float bias;
+4659H 	DL_INNER_RANGE	float range;
+465aH 	DL_OUTER_RANGE	float range;
+465bH 	DL_MULTIPLIER	float multiple;
+4680H 	N_AMBIENT_LIGHT
+4700H 	N_CAMERA	float camera_x, camera_y, camera_z; float target_x, target_y, target_z; float bank_angle; float focus;
+4710H 	CAM_SEE_CONE
+4720H 	CAM_RANGES	float near_range, far_range;
+4d4dH 	M3DMAGIC; 3DS Magic Number (.3DS file)
+4f00H 	HIERARCHY
+4f10H 	PARENT_OBJECT
+4f20H 	PIVOT_OBJECT
+4f30H 	PIVOT_LIMITS
+4f40H 	PIVOT_ORDER
+4f50H 	XLATE_RANGE
+5000H 	POLY_2D
+5010H 	SHAPE_OK
+5011H 	SHAPE_NOT_OK
+5020H 	SHAPE_HOOK
+6000H 	PATH_3D
+6005H 	PATH_MATRIX
+6010H 	SHAPE_2D
+6020H 	M_SCALE
+6030H 	M_TWIST
+6040H 	M_TEETER
+6050H 	M_FIT
+6060H 	M_BEVEL
+6070H 	XZ_CURVE
+6080H 	YZ_CURVE
+6090H 	INTERPCT
+60a0H 	DEFORM_LIMIT
+6100H 	USE_CONTOUR
+6110H 	USE_TWEEN
+6120H 	USE_SCALE
+6130H 	USE_TWIST
+6140H 	USE_TEETER
+6150H 	USE_FIT
+6160H 	USE_BEVEL
+7000H 	VIEWPORT_LAYOUT_OLD
+7001H 	VIEWPORT_LAYOUT; followed by viewport_size, viewport_data; short form, top, ready, wstate, swapws, swapport, swapcur;
+7010H 	VIEWPORT_DATA_OLD
+7011H 	VIEWPORT_DATA	short flags, axis_lockout; short win_x, win_y, win_w, winh_, win_view; float zoom; float worldcenter_x, worldcenter_y, worldcenter_z; float horiz_ang, vert_ang; cstr camera_name;
+7012H 	VIEWPORT_DATA_3	short flags, axis_lockout; short win_x, win_y, win_w, winh_, win_view; float zoom; float worldcenter_x, worldcenter_y, worldcenter_z; float horiz_ang, vert_ang; cstr camera_name;
+7020H 	VIEWPORT_SIZE	short x, y, w, h;
+7030H 	NETWORK_VIEW
+8000H 	XDATA_SECTION
+8001H 	XDATA_ENTRY
+8002H 	XDATA_APPNAME
+8003H 	XDATA_STRING
+8004H 	XDATA_FLOAT
+8005H 	XDATA_DOUBLE
+8006H 	XDATA_SHORT
+8007H 	XDATA_LONG
+8008H 	XDATA_VOID
+8009H 	XDATA_GROUP
+800aH 	XDATA_RFU6
+800bH 	XDATA_RFU5
+800cH 	XDATA_RFU4
+800dH 	XDATA_RFU3
+800eH 	XDATA_RFU2
+800fH 	XDATA_RFU1
+80f0H 	PARENT_NAME
+a000H 	MAT_NAME	cstr material_name;
+a010H 	MAT_AMBIENT; followed by color chunk
+a020H 	MAT_DIFFUSE; followed by color chunk
+a030H 	MAT_SPECULAR; followed by color chunk
+a040H 	MAT_SHININESS; followed by percentage chunk
+a041H 	MAT_SHIN2PCT; followed by percentage chunk
+a042H 	MAT_SHIN3PCT; followed by percentage chunk
+a050H 	MAT_TRANSPARENCY; followed by percentage chunk
+a052H 	MAT_XPFALL; followed by percentage chunk
+a053H 	MAT_REFBLUR; followed by percentage chunk
+a080H 	MAT_SELF_ILLUM
+a081H 	MAT_TWO_SIDE
+a082H 	MAT_DECAL
+a083H 	MAT_ADDITIVE
+a084H 	MAT_SELF_ILPCT; followed by percentage chunk
+a085H 	MAT_WIRE
+a086H 	MAT_SUPERSMP
+a087H 	MAT_WIRESIZE	float wire_size;
+a088H 	MAT_FACEMAP
+a08aH 	MAT_XPFALLIN
+a08cH 	MAT_PHONGSOFT
+a08eH 	MAT_WIREABS
+a100H 	MAT_SHADING	short shading_value;
+a200H 	MAT_TEXMAP; followed by percentage chunk, mat_mapname	mat_map_tiling, mat_map_texblur...
+a204H 	MAT_SPECMAP; followed by percentage_chunk, mat_mapname
+a210H 	MAT_OPACMAP; followed by percentage_chunk, mat_mapname
+a220H 	MAT_REFLMAP; followed by percentage_chunk, mat_mapname
+a230H 	MAT_BUMPMAP; followed by percentage_chunk, mat_mapname
+a240H 	MAT_USE_XPFALL
+a250H 	MAT_USE_REFBLUR
+a252H 	MAT_BUMP_PERCENT
+a300H 	MAT_MAPNAME	cstr filename;
+a310H 	MAT_ACUBIC
+a320H 	MAT_SXP_TEXT_DATA
+a321H 	MAT_SXP_TEXT2_DATA
+a322H 	MAT_SXP_OPAC_DATA
+a324H 	MAT_SXP_BUMP_DATA
+a325H 	MAT_SXP_SPEC_DATA
+a326H 	MAT_SXP_SHIN_DATA
+a328H 	MAT_SXP_SELFI_DATA
+a32aH 	MAT_SXP_TEXT_MASKDATA
+a32cH 	MAT_SXP_TEXT2_MASKDATA
+a32eH 	MAT_SXP_OPAC_MASKDATA
+a330H 	MAT_SXP_BUMP_MASKDATA
+a332H 	MAT_SXP_SPEC_MASKDATA
+a334H 	MAT_SXP_SHIN_MASKDATA
+a336H 	MAT_SXP_SELFI_MASKDATA
+a338H 	MAT_SXP_REFL_MASKDATA
+a33aH 	MAT_TEX2MAP
+a33cH 	MAT_SHINMAP
+a33dH 	MAT_SELFIMAP
+a33eH 	MAT_TEXMASK
+a340H 	MAT_TEX2MASK
+a342H 	MAT_OPACMASK
+a344H 	MAT_BUMPMASK
+a346H 	MAT_SHINMASK
+a348H 	MAT_SPECMASK
+a34aH 	MAT_SELFIMASK
+a34cH 	MAT_REFLMASK
+a350H 	MAT_MAP_TILINGOLD
+a351H 	MAT_MAP_TILING	short flags;
+a352H 	MAT_MAP_TEXBLUR_OLD
+a353H 	MAT_MAP_TEXBLUR	float blurring;
+a354H 	MAT_MAP_USCALE
+a356H 	MAT_MAP_VSCALE
+a358H 	MAT_MAP_UOFFSET
+a35aH 	MAT_MAP_VOFFSET
+a35cH 	MAT_MAP_ANG
+a360H 	MAT_MAP_COL1
+a362H 	MAT_MAP_COL2
+a364H 	MAT_MAP_RCOL
+a366H 	MAT_MAP_GCOL
+a368H 	MAT_MAP_BCOL
+afffH 	MAT_ENTRY
+b000H 	KFDATA; followed by kfhdr
+b001H 	AMBIENT_NODE_TAG
+b002H 	OBJECT_NODE_TAG; followed by node_hdr, pivot, pos_track_tag, rot_track_tag, scl_track_tag, morph_smooth...
+b003H 	CAMERA_NODE_TAG; followed by node_hdr, pos_track_tag, fov_track_tag, roll_track_tag...
+b004H 	TARGET_NODE_TAG; followed by node_hdr, pos_track_tag...
+b005H 	LIGHT_NODE_TAG; followed by node_hdr, pos_track_tag, col_track_tag...
+b006H 	L_TARGET_NODE_TAG; followed by node_id, node_hdr, pos_track_tag
+b007H 	SPOTLIGHT_NODE_TAG; followed by node_id, node_hdr, pos_track_tag, hot_track_tag, fall_track_tag, roll_track_tag, col_track_tag...
+b008H 	KFSEG	short start, end;
+b009H 	KFCURTIME	short curframe;
+b00aH 	KFHDR followed by viewport_layout, kfseg, kfcurtime, object_node_tag, light_node_tag, target_node_tag, camera_node_tag, l_target_node_tag, spotlight_node_tag, ambient_node_tag...	short revision; cstr filename; short animlen;
+b010H 	NODE_HDR	cstr objname; short flags1; short flags2; short heirarchy; ?
+b011H 	INSTANCE_NAME
+b012H 	PRESCALE
+b013H 	PIVOT	float pivot_x, pivot_y, pivot_z;
+b014H 	BOUNDBOX
+b015H 	MORPH_SMOOTH	float morph_smoothing_angle_rad;
+b020H 	POS_TRACK_TAG	short flags; short unknown[4]; short keys; short unknown; struct {short framenum; long unknown; float pos_x, pos_y, pos_z;} pos[keys];
+b021H 	ROT_TRACK_TAG	short flags; short unknown[4]; short keys; short unknown; struct {short framenum; long unknown; float rotation_rad; float axis_x, axis_y, axis_z;} rot[keys];
+b022H 	SCL_TRACK_TAG	short flags; short unknown[4]; short keys; short unknown; struct {short framenum; long unknown; float scale_x, scale_y, scale_z;} scale[keys];
+b023H 	FOV_TRACK_TAG	short flags; short unknown[4]; short keys; short unknown; struct {short framenum; long unknown; float camera_field_of_view;} fov[keys]
+b024H 	ROLL_TRACK_TAG	short flags; short unknown[4]; short keys; short unknown; struct {short framenum; long unknown; float camera_roll;} roll[keys];
+b025H 	COL_TRACK_TAG	short flags; short unknown[4]; short keys; short unknown; struct {short framenum; long unknown; float red, rgn, blu; } color[keys];
+b026H 	MORPH_TRACK_TAG short flags; short unknown[4]; short keys; short unknown; struct {short framenum; long unknown; cstr obj_name; } morph[keys];
+b027H 	HOT_TRACK_TAG	short flags; short unknown[4]; short keys; short unknown; struct {short framenum; long unknown; float hotspot_ang;} hotspot[keys];
+b028H 	FALL_TRACK_TAG	short flags; short unknown[4]; short keys; short unknown; struct {short framenum; long unknown; float falloff_ang;} falloff[keys];
+b029H 	HIDE_TRACK_TAG
+b030H 	NODE_ID	short id;
+c010H 	C_MDRAWER
+c020H 	C_TDRAWER
+c030H 	C_SHPDRAWER
+c040H 	C_MODDRAWER
+c050H 	C_RIPDRAWER
+c060H 	C_TXDRAWER
+c062H 	C_PDRAWER
+c064H 	C_MTLDRAWER
+c066H 	C_FLIDRAWER
+c067H 	C_CUBDRAWER
+c070H 	C_MFILE
+c080H 	C_SHPFILE
+c090H 	C_MODFILE
+c0a0H 	C_RIPFILE
+c0b0H 	C_TXFILE
+c0b2H 	C_PFILE
+c0b4H 	C_MTLFILE
+c0b6H 	C_FLIFILE
+c0b8H 	C_PALFILE
+c0c0H 	C_TX_STRING
+c0d0H 	C_CONSTS
+c0e0H 	C_SNAPS
+c0f0H 	C_GRIDS
+c100H 	C_ASNAPS
+c110H 	C_GRID_RANGE
+c120H 	C_RENDTYPE
+c130H 	C_PROGMODE
+c140H 	C_PREVMODE
+c150H 	C_MODWMODE
+c160H 	C_MODMODEL
+c170H 	C_ALL_LINES
+c180H 	C_BACK_TYPE
+c190H 	C_MD_CS
+c1a0H 	C_MD_CE
+c1b0H 	C_MD_SML
+c1c0H 	C_MD_SMW
+c1c3H 	C_LOFT_WITH_TEXTURE
+c1c4H 	C_LOFT_L_REPEAT
+c1c5H 	C_LOFT_W_REPEAT
+c1c6H 	C_LOFT_UV_NORMALIZE
+c1c7H 	C_WELD_LOFT
+c1d0H 	C_MD_PDET
+c1e0H 	C_MD_SDET
+c1f0H 	C_RGB_RMODE
+c200H 	C_RGB_HIDE
+c202H 	C_RGB_MAPSW
+c204H 	C_RGB_TWOSIDE
+c208H 	C_RGB_SHADOW
+c210H 	C_RGB_AA
+c220H 	C_RGB_OVW
+c230H 	C_RGB_OVH
+c23dH 	CMAGIC
+c240H 	C_RGB_PICTYPE
+c250H 	C_RGB_OUTPUT
+c253H 	C_RGB_TODISK
+c254H 	C_RGB_COMPRESS
+c255H 	C_JPEG_COMPRESSION
+c256H 	C_RGB_DISPDEV
+c259H 	C_RGB_HARDDEV
+c25aH 	C_RGB_PATH
+c25bH 	C_BITMAP_DRAWER
+c260H 	C_RGB_FILE
+c270H 	C_RGB_OVASPECT
+c271H 	C_RGB_ANIMTYPE
+c272H 	C_RENDER_ALL
+c273H 	C_REND_FROM
+c274H 	C_REND_TO
+c275H 	C_REND_NTH
+c276H 	C_PAL_TYPE
+c277H 	C_RND_TURBO
+c278H 	C_RND_MIP
+c279H 	C_BGND_METHOD
+c27aH 	C_AUTO_REFLECT
+c27bH 	C_VP_FROM
+c27cH 	C_VP_TO
+c27dH 	C_VP_NTH
+c27eH 	C_REND_TSTEP
+c27fH 	C_VP_TSTEP
+c280H 	C_SRDIAM
+c290H 	C_SRDEG
+c2a0H 	C_SRSEG
+c2b0H 	C_SRDIR
+c2c0H 	C_HETOP
+c2d0H 	C_HEBOT
+c2e0H 	C_HEHT
+c2f0H 	C_HETURNS
+c300H 	C_HEDEG
+c310H 	C_HESEG
+c320H 	C_HEDIR
+c330H 	C_QUIKSTUFF
+c340H 	C_SEE_LIGHTS
+c350H 	C_SEE_CAMERAS
+c360H 	C_SEE_3D
+c370H 	C_MESHSEL
+c380H 	C_MESHUNSEL
+c390H 	C_POLYSEL
+c3a0H 	C_POLYUNSEL
+c3a2H 	C_SHPLOCAL
+c3a4H 	C_MSHLOCAL
+c3b0H 	C_NUM_FORMAT
+c3c0H 	C_ARCH_DENOM
+c3d0H 	C_IN_DEVICE
+c3e0H 	C_MSCALE
+c3f0H 	C_COMM_PORT
+c400H 	C_TAB_BASES
+c410H 	C_TAB_DIVS
+c420H 	C_MASTER_SCALES
+c430H 	C_SHOW_1STVERT
+c440H 	C_SHAPER_OK
+c450H 	C_LOFTER_OK
+c460H 	C_EDITOR_OK
+c470H 	C_KEYFRAMER_OK
+c480H 	C_PICKSIZE
+c490H 	C_MAPTYPE
+c4a0H 	C_MAP_DISPLAY
+c4b0H 	C_TILE_XY
+c4c0H 	C_MAP_XYZ
+c4d0H 	C_MAP_SCALE
+c4e0H 	C_MAP_MATRIX_OLD
+c4e1H 	C_MAP_MATRIX
+c4f0H 	C_MAP_WID_HT
+c500H 	C_OBNAME
+c510H 	C_CAMNAME
+c520H 	C_LTNAME
+c525H 	C_CUR_MNAME
+c526H 	C_CURMTL_FROM_MESH
+c527H 	C_GET_SHAPE_MAKE_FACES
+c530H 	C_DETAIL
+c540H 	C_VERTMARK
+c550H 	C_MSHAX
+c560H 	C_MSHCP
+c570H 	C_USERAX
+c580H 	C_SHOOK
+c590H 	C_RAX
+c5a0H 	C_STAPE
+c5b0H 	C_LTAPE
+c5c0H 	C_ETAPE
+c5c8H 	C_KTAPE
+c5d0H 	C_SPHSEGS
+c5e0H 	C_GEOSMOOTH
+c5f0H 	C_HEMISEGS
+c600H 	C_PRISMSEGS
+c610H 	C_PRISMSIDES
+c620H 	C_TUBESEGS
+c630H 	C_TUBESIDES
+c640H 	C_TORSEGS
+c650H 	C_TORSIDES
+c660H 	C_CONESIDES
+c661H 	C_CONESEGS
+c670H 	C_NGPARMS
+c680H 	C_PTHLEVEL
+c690H 	C_MSCSYM
+c6a0H 	C_MFTSYM
+c6b0H 	C_MTTSYM
+c6c0H 	C_SMOOTHING
+c6d0H 	C_MODICOUNT
+c6e0H 	C_FONTSEL
+c6f0H 	C_TESS_TYPE
+c6f1H 	C_TESS_TENSION
+c700H 	C_SEG_START
+c705H 	C_SEG_END
+c710H 	C_CURTIME
+c715H 	C_ANIMLENGTH
+c720H 	C_PV_FROM
+c725H 	C_PV_TO
+c730H 	C_PV_DOFNUM
+c735H 	C_PV_RNG
+c740H 	C_PV_NTH
+c745H 	C_PV_TYPE
+c750H 	C_PV_METHOD
+c755H 	C_PV_FPS
+c765H 	C_VTR_FRAMES
+c770H 	C_VTR_HDTL
+c771H 	C_VTR_HD
+c772H 	C_VTR_TL
+c775H 	C_VTR_IN
+c780H 	C_VTR_PK
+c785H 	C_VTR_SH
+c790H 	C_WORK_MTLS
+c792H 	C_WORK_MTLS_2
+c793H 	C_WORK_MTLS_3
+c794H 	C_WORK_MTLS_4
+c7a1H 	C_BGTYPE
+c7b0H 	C_MEDTILE
+c7d0H 	C_LO_CONTRAST
+c7d1H 	C_HI_CONTRAST
+c7e0H 	C_FROZ_DISPLAY
+c7f0H 	C_BOOLWELD
+c7f1H 	C_BOOLTYPE
+c900H 	C_ANG_THRESH
+c901H 	C_SS_THRESH
+c903H 	C_TEXTURE_BLUR_DEFAULT
+ca00H 	C_MAPDRAWER
+ca01H 	C_MAPDRAWER1
+ca02H 	C_MAPDRAWER2
+ca03H 	C_MAPDRAWER3
+ca04H 	C_MAPDRAWER4
+ca05H 	C_MAPDRAWER5
+ca06H 	C_MAPDRAWER6
+ca07H 	C_MAPDRAWER7
+ca08H 	C_MAPDRAWER8
+ca09H 	C_MAPDRAWER9
+ca10H 	C_MAPDRAWER_ENTRY
+ca20H 	C_BACKUP_FILE
+ca21H 	C_DITHER_256
+ca22H 	C_SAVE_LAST
+ca23H 	C_USE_ALPHA
+ca24H 	C_TGA_DEPTH
+ca25H 	C_REND_FIELDS
+ca26H 	C_REFLIP
+ca27H 	C_SEL_ITEMTOG
+ca28H 	C_SEL_RESET
+ca29H 	C_STICKY_KEYINF
+ca2aH 	C_WELD_THRESHOLD
+ca2bH 	C_ZCLIP_POINT
+ca2cH 	C_ALPHA_SPLIT
+ca30H 	C_KF_SHOW_BACKFACE
+ca40H 	C_OPTIMIZE_LOFT
+ca42H 	C_TENS_DEFAULT
+ca44H 	C_CONT_DEFAULT
+ca46H 	C_BIAS_DEFAULT
+ca50H 	C_DXFNAME_SRC
+ca60H 	C_AUTO_WELD
+ca70H 	C_AUTO_UNIFY
+ca80H 	C_AUTO_SMOOTH
+ca90H 	C_DXF_SMOOTH_ANG
+caa0H 	C_SMOOTH_ANG
+cb00H 	C_WORK_MTLS_5
+cb01H 	C_WORK_MTLS_6
+cb02H 	C_WORK_MTLS_7
+cb03H 	C_WORK_MTLS_8
+cb04H 	C_WORKMTL
+cb10H 	C_SXP_TEXT_DATA
+cb11H 	C_SXP_OPAC_DATA
+cb12H 	C_SXP_BUMP_DATA
+cb13H 	C_SXP_SHIN_DATA
+cb20H 	C_SXP_TEXT2_DATA
+cb24H 	C_SXP_SPEC_DATA
+cb28H 	C_SXP_SELFI_DATA
+cb30H 	C_SXP_TEXT_MASKDATA
+cb32H 	C_SXP_TEXT2_MASKDATA
+cb34H 	C_SXP_OPAC_MASKDATA
+cb36H 	C_SXP_BUMP_MASKDATA
+cb38H 	C_SXP_SPEC_MASKDATA
+cb3aH 	C_SXP_SHIN_MASKDATA
+cb3eH 	C_SXP_REFL_MASKDATA
+cc00H 	C_NET_USE_VPOST
+cc10H 	C_NET_USE_GAMMA
+cc20H 	C_NET_FIELD_ORDER
+cd00H 	C_BLUR_FRAMES
+cd10H 	C_BLUR_SAMPLES
+cd20H 	C_BLUR_DUR
+cd30H 	C_HOT_METHOD
+cd40H 	C_HOT_CHECK
+cd50H 	C_PIXEL_SIZE
+cd60H 	C_DISP_GAMMA
+cd70H 	C_FBUF_GAMMA
+cd80H 	C_FILE_OUT_GAMMA
+cd82H 	C_FILE_IN_GAMMA
+cd84H 	C_GAMMA_CORRECT
+cd90H 	C_APPLY_DISP_GAMMA
+cda0H 	C_APPLY_FBUF_GAMMA
+cdb0H 	C_APPLY_FILE_GAMMA
+cdc0H 	C_FORCE_WIRE
+cdd0H 	C_RAY_SHADOWS
+cde0H 	C_MASTER_AMBIENT
+cdf0H 	C_SUPER_SAMPLE
+ce00H 	C_OBJECT_MBLUR
+ce10H 	C_MBLUR_DITHER
+ce20H 	C_DITHER_24
+ce30H 	C_SUPER_BLACK
+ce40H 	C_SAFE_FRAME
+ce50H 	C_VIEW_PRES_RATIO
+ce60H 	C_BGND_PRES_RATIO
+ce70H 	C_NTH_SERIAL_NUM
+d000H 	VPDATA
+d100H 	P_QUEUE_ENTRY
+d110H 	P_QUEUE_IMAGE
+d114H 	P_QUEUE_USEIGAMMA
+d120H 	P_QUEUE_PROC
+d130H 	P_QUEUE_SOLID
+d140H 	P_QUEUE_GRADIENT
+d150H 	P_QUEUE_KF
+d152H 	P_QUEUE_MOTBLUR
+d153H 	P_QUEUE_MB_REPEAT
+d160H 	P_QUEUE_NONE
+d180H 	P_QUEUE_RESIZE
+d185H 	P_QUEUE_OFFSET
+d190H 	P_QUEUE_ALIGN
+d1a0H 	P_CUSTOM_SIZE
+d210H 	P_ALPH_NONE
+d220H 	P_ALPH_PSEUDO
+d221H 	P_ALPH_OP_PSEUDO
+d222H 	P_ALPH_BLUR
+d225H 	P_ALPH_PCOL
+d230H 	P_ALPH_C0
+d231H 	P_ALPH_OP_KEY
+d235H 	P_ALPH_KCOL
+d238H 	P_ALPH_OP_NOCONV
+d240H 	P_ALPH_IMAGE
+d250H 	P_ALPH_ALPHA
+d260H 	P_ALPH_QUES
+d265H 	P_ALPH_QUEIMG
+d270H 	P_ALPH_CUTOFF
+d280H 	P_ALPHANEG
+d300H 	P_TRAN_NONE
+d310H 	P_TRAN_IMAGE
+d312H 	P_TRAN_FRAMES
+d320H 	P_TRAN_FADEIN
+d330H 	P_TRAN_FADEOUT
+d340H 	P_TRANNEG
+d400H 	P_RANGES
+d500H 	P_PROC_DATA
+f020H 	POS_TRACK_TAG_KEY
+f021H 	ROT_TRACK_TAG_KEY
+f022H 	SCL_TRACK_TAG_KEY
+f023H 	FOV_TRACK_TAG_KEY
+f024H 	ROLL_TRACK_TAG_KEY
+f025H 	COL_TRACK_TAG_KEY
+f026H 	MORPH_TRACK_TAG_KEY
+f027H 	HOT_TRACK_TAG_KEY
+f028H 	FALL_TRACK_TAG_KEY
+f110H 	POINT_ARRAY_ENTRY
+f111H 	POINT_FLAG_ARRAY_ENTRY
+f120H 	FACE_ARRAY_ENTRY
+f130H 	MSH_MAT_GROUP_ENTRY
+f140H 	TEX_VERTS_ENTRY
+f150H 	SMOOTH_GROUP_ENTRY
+ffffH 	DUMMY
