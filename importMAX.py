@@ -5,7 +5,7 @@ __author__ = "Jens M. Plonka"
 __url__    = "https://www.github.com/jmplonka/Importer3D"
 
 import FreeCAD, triangulate, numpy, zlib, sys, traceback
-from importUtils import missingDependency, canImport, newObject, getValidName, getByte, getShorts, getShort, getInts, getInt, getLong, getFloats, getFloat
+from importUtils import missingDependency, canImport, newObject, getValidName, getByte, getShorts, getShort, getInts, getInt, getFloats, getFloat
 from math        import degrees
 
 try:
@@ -91,17 +91,17 @@ class ByteArrayChunk(AbstractChunk):
 		except:
 			self.data = data
 	def setData(self, data):
-		if (self.type == 0x0340): self.setStr16(data)
+		if   (self.type == 0x0340): self.setStr16(data)
 		elif (self.type == 0x0456): self.setStr16(data)
 		elif (self.type == 0x0962): self.setStr16(data)
-		elif (self.type == 0x2034): self.set(data, "int[]", '<' + 'I'*(len(data)/4), 0, len(data))
-		elif (self.type == 0x2035): self.set(data, "int{}", '<' + 'I'*(len(data)/4), 0, len(data))
-		elif (self.type == 0x2501): self.set(data, "float[]", '<' + 'f'*(len(data)/4), 0, len(data))
-		elif (self.type == 0x2503): self.set(data, "float[]", '<' + 'f'*(len(data)/4), 0, len(data))
-		elif (self.type == 0x2504): self.set(data, "float[]", '<' + 'f'*(len(data)/4), 0, len(data))
-		elif (self.type == 0x2505): self.set(data, "float[]", '<' + 'f'*(len(data)/4), 0, len(data))
-		elif (self.type == 0x2510): self.set(data, "struct", '<' + 'f'*((len(data)/4) - 1) + 'i', 0, len(data))
-		elif (self.type == 0x2511): self.set(data, "float[]", '<' + 'f'*(len(data)/4), 0, len(data))
+		elif (self.type == 0x2034): self.set(data, "int[]",   '<' + 'I'*int(len(data)/4), 0, len(data))
+		elif (self.type == 0x2035): self.set(data, "int{}",   '<' + 'I'*int(len(data)/4), 0, len(data))
+		elif (self.type == 0x2501): self.set(data, "float[]", '<' + 'f'*int(len(data)/4), 0, len(data))
+		elif (self.type == 0x2503): self.set(data, "float[]", '<' + 'f'*int(len(data)/4), 0, len(data))
+		elif (self.type == 0x2504): self.set(data, "float[]", '<' + 'f'*int(len(data)/4), 0, len(data))
+		elif (self.type == 0x2505): self.set(data, "float[]", '<' + 'f'*int(len(data)/4), 0, len(data))
+		elif (self.type == 0x2510): self.set(data, "struct",  '<' + 'f'*int(len(data)/4 - 1) + 'i', 0, len(data))
+		elif (self.type == 0x2511): self.set(data, "float[]", '<' + 'f'*int(len(data)/4), 0, len(data))
 		elif (self.type == 0x4001): self.setStr16(data)
 		elif (self.type == 0x0100): self.set(data, "float", '<f' , 0, len(data))
 		else:
@@ -216,8 +216,8 @@ class ChunkReader():
 		typ, siz, = struct.unpack("<Hi", data[offset:offset+header])
 		chunkSize = siz & 0x7FFFFFFF
 		if (siz == 0):
-			siz, dummy = getLong(data, offset+6)
-			header = 14
+			siz, = struct.unpack("<q", data[offset+header:offset+header+8])
+			header += 8
 			chunkSize = siz & 0x7FFFFFFFFFFFFFFF
 		if (siz < 0):
 			chunk = containerReader(typ, chunkSize, level, number, primitiveReader)

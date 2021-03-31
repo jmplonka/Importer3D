@@ -27,7 +27,6 @@ def canImport():
 	return _can_import
 
 def missingDependency(module):
-	import os
 	import subprocess
 
 	subprocess.call(['python', '-m', 'pip', 'install', module])
@@ -65,13 +64,11 @@ def _gets(data, fmt, size, offset, count):
 	values = struct.unpack(ENDIANNESS + fmt*count, data[offset:end])
 	return values, end
 
-def getLong(data, offset):  return _get(data, 'q', 8, offset)
 def getFloat(data, offset): return _get(data, 'f', 4, offset)
 def getInt(data, offset):   return _get(data, 'i', 4, offset)
 def getShort(data, offset): return _get(data, 'H', 2, offset)
 def getByte(data, offset):  return _get(data, 'B', 1, offset)
 
-def getLongs(data, offset, count):  return _gets(data, 'q', 8, offset, count)
 def getFloats(data, offset, count): return _gets(data, 'f', 4, offset, count)
 def getInts(data, offset, count):   return _gets(data, 'i', 4, offset, count)
 def getShorts(data, offset, count): return _gets(data, 'H', 2, offset, count)
