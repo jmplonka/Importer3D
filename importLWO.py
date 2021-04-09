@@ -26,10 +26,14 @@ http://static.lightwave3d.com/sdk/11-6/html/filefmts/lwo2.html
 #     Made edge creation safer.
 # 1.0 (Ken9) First Release
 
-import os, struct, chunk, traceback, FreeCAD, importUtils, Part
+import os, chunk, traceback, FreeCAD, importUtils, Part
 from importUtils import getBytes, getShort, getShorts, getFloat, getFloats, newObject, newGroup, setEndianess, BIG_ENDIAN
 from itertools import groupby
 from triangulate import getTriangles
+from struct import Struct, unpack
+
+UNPACK_NAME  = Struct("4s").unpack_from
+UNPACK_LAYER = Struct(">HH").unpack_from
 
 V = FreeCAD.Vector
 class Layer(object):
@@ -68,7 +72,7 @@ def read(doc, filename):
 
 	try:
 		setEndianess(BIG_ENDIAN)
-		header, chunk_size, chunk_name = struct.unpack(">4s1L4s", file.read(12))
+		header, chunk_size, chunk_name = unpack(">4s1L4s", file.read(12))
 		layers = {}
 		surfs  = {}
 		tags   = []
@@ -129,7 +133,7 @@ def readLwo1(file, filename, layers, surfs, tags):
 			last_pols_count = readPols1(rootchunk.read(), layer)
 			layer.has_subds = True
 		elif rootchunk.chunkname == b'PTAG':
-			tag_type, = struct.unpack("4s", rootchunk.read(4))
+			tag_type, = UNPACK_NAME(rootchunk.read(4))
 			if tag_type == b'SURF':
 				readSurfTags(rootchunk.read(), layer, last_pols_count)
 			else:
@@ -169,7 +173,7 @@ def readLwo2(file, filename, layers, surfs, tags):
 					layer.has_subds = True
 				rootchunk.skip()
 		elif rootchunk.chunkname == b'PTAG':
-			sub_type, = struct.unpack("4s", rootchunk.read(4))
+			sub_type, = UNPACK_NAME(rootchunk.read(4))
 			if sub_type == b'SURF':
 				readSurfTags(rootchunk.read(), layer, last_pols_count)
 			else:
@@ -220,7 +224,7 @@ def readLayr1(layr_bytes, layers):
 	Read the object's layer data.
 	'''
 	layer = Layer()
-	layer.index, flags = struct.unpack(">HH", layr_bytes[0:4])
+	layer.index, flags = UNPACK_LAYER(layr_bytes[0:4])
 #	FreeCAD.Console.PrintMessage("Reading Object Layer %d:\n" %(layer.index))
 
 	offset = 4
@@ -240,7 +244,7 @@ def readLayr2(layr_bytes, layers):
 	Read the object's layer data.
 	'''
 	layer = Layer()
-	layer.index, flags = struct.unpack(">HH", layr_bytes[0:4])
+	layer.index, flags = UNPACK_LAYER(layr_bytes[0:4])
 #	FreeCAD.Console.PrintMessage("Reading Object Layer %d:\n" %(layer.index))
 
 	offset = 4
@@ -359,7 +363,7 @@ def readSurf1(surf_bytes, objMaterials):
 	offset = name_len
 	chunk_len = len(surf_bytes)
 	while offset < chunk_len:
-		subchunk_name, = struct.unpack("4s", surf_bytes[offset:offset+4])
+		subchunk_name, = UNPACK_NAME(surf_bytes[offset:offset+4])
 		offset += 4
 		subchunk_len, offset = getShort(surf_bytes, offset)
 
@@ -409,7 +413,7 @@ def readSurf2(surf_bytes, objMaterials):
 	offset = name_len + s_name_len
 	chunk_len = len(surf_bytes)
 	while offset < chunk_len:
-		subchunk_name, = struct.unpack("4s", surf_bytes[offset:offset+4])
+		subchunk_name, = UNPACK_NAME(surf_bytes[offset:offset+4])
 		offset += 4
 		subchunk_len, offset = getShort(surf_bytes, offset)
 
@@ -442,35 +446,22 @@ def buildObject(doc, parent, layer, objMaterials, objTags):
 	mfacets = []
 	if (layer.pols):
 		for pol in layer.pols:
-			if len(pol) > 2:
-				ngon = [layer.pnts[idx] for idx in pol]
-				if (len(pol)>3):
-					points = [V(k) for k in ngon]
-					points.append(points[0])
-					wire = Part.makePolygon(points)
-					try:
-						face = Part.Face(wire)
-						tris = face.tessellate(1)
-						for tri in tris[1]:
-							data.append([tris[0][i] for i in tri])
-					except:
-						try:
-							triangles = getTriangles(ngon)
-							for triangle in triangles:
-								data.append(triangle)
-						except ValueError as e:
-							FreeCAD.Console.PrintWarning("   skipping polygon (%s): %s\n"%(e, ngon))
-				else:
-					data.append(ngon)
-#				ngon = [i[0] for i in groupby(ngon)]
-#				if (ngon[0] == ngon[-1]):
-#					ngon = ngon[:-1]
-#				try:
-#					triangles = getTriangles(ngon)
-#					for triangle in triangles:
-#						data.append(triangle)
-#				except ValueError as e:
-#					FreeCAD.Console.PrintWarning("   skipping polygon (%s): %s\n"%(e, ngon))
+			ngon = [layer.pnts[idx] for idx in pol]
+			points = [V(k) for k in ngon]
+			points.append(points[0])
+			if len(ngon) > 2:
+				wire = Part.makePolygon(points)
+				plane = wire.findPlane(0.00001)
+				points2 =  [plane.projectPoint(p) for p in points]
+				wire = Part.makePolygon(points2)
+				try:
+					face = Part.Face(wire)
+					tris = face.tessellate(0.1)
+					for tri in tris[1]:
+						data.append([tris[0][i] for i in tri])
+				except Exception as e:
+					Part.show(wire)
+					FreeCAD.Console.PrintWarning("   skipping polygon (%s): %s\n"%(e, ngon))
 
 	me = newObject(doc, layer.name, data)
 	me.Placement.Base = FreeCAD.Vector(layer.pivot)

@@ -4,7 +4,8 @@ __title__  = "Collection of utilities for 3D Mesh importers"
 __author__ = "Jens M. Plonka"
 __url__    = "https://www.github.com/jmplonka/Importer3D"
 
-import re, Mesh, FreeCAD, struct
+import re, Mesh, FreeCAD
+from struct import unpack
 
 INVALID_NAME = re.compile('^[0-9].*')
 
@@ -56,12 +57,12 @@ def newGroup(parent, name):
 
 def _get(data, fmt, size, offset):
 	end = offset + size
-	value, = struct.unpack(ENDIANNESS + fmt, data[offset:end])
+	value, = unpack(ENDIANNESS + fmt, data[offset:end])
 	return value, end
 
 def _gets(data, fmt, size, offset, count):
 	end = offset + (count * size)
-	values = struct.unpack(ENDIANNESS + fmt*count, data[offset:end])
+	values = unpack(ENDIANNESS + fmt*count, data[offset:end])
 	return values, end
 
 def getFloat(data, offset): return _get(data, 'f', 4, offset)

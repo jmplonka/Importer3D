@@ -5,17 +5,21 @@ __author__ = "Jens M. Plonka"
 __url__    = "https://www.github.com/jmplonka/Importer3D"
 
 import FreeCAD, triangulate, numpy, zlib, sys, traceback
-from importUtils import missingDependency, canImport, newObject, getValidName, getByte, getShorts, getShort, getInts, getInt, getFloats, getFloat
+from importUtils import missingDependency, canImport, newObject, getValidName, getByte, getShorts, getShort, getInts, getInt, getFloats, getFloat, setEndianess, LITTLE_ENDIAN
 from math        import degrees
+from struct      import Struct, unpack
+from BasicShapes import Shapes, ViewProviderShapes
 
 try:
 	import olefile
 except:
 	missingDependency("olefile")
 
-import struct
+UNPACK_BOX_DATA = Struct('<hihhbff').unpack_from  # Index, int, short, short, byte, float, Length
 
 DEBUG         = False # Dump chunk content to console?
+
+TYP_NAME     = 0x0962
 
 CLS_DATA      = []
 CONFIG        = []
@@ -62,14 +66,14 @@ class AbstractChunk():
 		self.resolved = False
 	def __str__(self):
 		if (self.unknown == True):
-			return "%s[%4x] %04X: %s" %("  "*self.level, self.number, self.type, ":".join("%02x"%(ord(c)) for c in self.data))
+			return "%s[%4x] %04X: %s" %("  "*self.level, self.number, self.type, ":".join("%02x"%(c) for c in self.data))
 		return "%s[%4x] %04X: %s=%s" %("  "*self.level, self.number, self.type, self.format, self.data)
 
 class ByteArrayChunk(AbstractChunk):
 	def __init__(self, type, data, level, number): AbstractChunk.__init__(self, type, data, level, number)
 	def set(self, data, name, format, start, end):
 		try:
-			self.data = struct.unpack(format, data[start:end])
+			self.data = unpack(format, data[start:end])
 			self.format = name
 			self.unknown = False
 		except Exception as e:
@@ -91,18 +95,10 @@ class ByteArrayChunk(AbstractChunk):
 		except:
 			self.data = data
 	def setData(self, data):
-		if   (self.type == 0x0340): self.setStr16(data)
-		elif (self.type == 0x0456): self.setStr16(data)
-		elif (self.type == 0x0962): self.setStr16(data)
-		elif (self.type == 0x2034): self.set(data, "int[]",   '<' + 'I'*int(len(data)/4), 0, len(data))
-		elif (self.type == 0x2035): self.set(data, "int{}",   '<' + 'I'*int(len(data)/4), 0, len(data))
-		elif (self.type == 0x2501): self.set(data, "float[]", '<' + 'f'*int(len(data)/4), 0, len(data))
-		elif (self.type == 0x2503): self.set(data, "float[]", '<' + 'f'*int(len(data)/4), 0, len(data))
-		elif (self.type == 0x2504): self.set(data, "float[]", '<' + 'f'*int(len(data)/4), 0, len(data))
-		elif (self.type == 0x2505): self.set(data, "float[]", '<' + 'f'*int(len(data)/4), 0, len(data))
+		if   (self.type in [0x0340, 0x4001, 0x0456, 0x0962]): self.setStr16(data)
+		elif (self.type in [0x2034, 0x2035]):         self.set(data, "int{}",   '<' + 'I'*int(len(data)/4), 0, len(data))
+		elif (self.type in [0x2501, 0x2503, 0x2504, 0x2505, 0x2511]): self.set(data, "float[]", '<' + 'f'*int(len(data)/4), 0, len(data))
 		elif (self.type == 0x2510): self.set(data, "struct",  '<' + 'f'*int(len(data)/4 - 1) + 'i', 0, len(data))
-		elif (self.type == 0x2511): self.set(data, "float[]", '<' + 'f'*int(len(data)/4), 0, len(data))
-		elif (self.type == 0x4001): self.setStr16(data)
 		elif (self.type == 0x0100): self.set(data, "float", '<f' , 0, len(data))
 		else:
 			self.unknown = True
@@ -112,7 +108,7 @@ class ByteArrayChunk(AbstractChunk):
 		except Exception as e:
 			self.format = None
 			self.unknown = True
-			self.data =  ":".join("%02x"%(ord(c)) for c in data)
+			self.data =  ":".join("%02x"%(c) for c in data)
 			if (DEBUG): FreeCAD.Console.PrintMessage("%s\n" %(self))
 
 class ClsDir3Chunk(ByteArrayChunk):
@@ -124,7 +120,7 @@ class ClsDir3Chunk(ByteArrayChunk):
 		elif (self.type == 0x2060): self.set(data, "struct", '<IQI', 0, 16) # DllIndex, ID, SuperID
 		else:
 			self.unknown = False
-			self.data =  ":".join("%02x"%(ord(c)) for c in data)
+			self.data =  ":".join("%02x"%(c) for c in data)
 		try:
 			if (DEBUG): FreeCAD.Console.PrintMessage("%s\n" %(self))
 		except:
@@ -143,7 +139,7 @@ class DllDirChunk(ByteArrayChunk):
 		except:
 			self.format = None
 			self.unknown = False
-			self.data =  ":".join("%02x"%(ord(c)) for c in data)
+			self.data =  ":".join("%02x"%(c) for c in data)
 			if (DEBUG): FreeCAD.Console.PrintMessage("%s\n" %(self))
 
 class ContainerChunk(AbstractChunk):
@@ -213,10 +209,10 @@ class ChunkReader():
 
 	def getNextChunk(self, data, offset, level, number, containerReader, primitiveReader):
 		header = 6
-		typ, siz, = struct.unpack("<Hi", data[offset:offset+header])
+		typ, siz, = unpack("<Hi", data[offset:offset+header])
 		chunkSize = siz & 0x7FFFFFFF
 		if (siz == 0):
-			siz, = struct.unpack("<q", data[offset+header:offset+header+8])
+			siz, = unpack("<q", data[offset+header:offset+header+8])
 			header += 8
 			chunkSize = siz & 0x7FFFFFFFFFFFFFFF
 		if (siz < 0):
@@ -267,8 +263,14 @@ def getNodeParent(node):
 
 def getNodeName(node):
 	if (node):
-		name = node.getFirst(0x0962)
+		name = node.getFirst(TYP_NAME)
 		if (name): return name.data
+	return None
+
+def getClass(chunk):
+	global CLS_DIR3_LIST
+	if (chunk.type < len(CLS_DIR3_LIST)):
+		return CLS_DIR3_LIST[chunk.type]
 	return None
 
 def getDll(container):
@@ -276,12 +278,6 @@ def getDll(container):
 	idx = container.getFirst(0x2060).data[0]
 	if (idx < len(DLL_DIR_LIST)):
 		return DLL_DIR_LIST[idx]
-	return None
-
-def getClass(chunk):
-	global CLS_DIR3_LIST
-	if (chunk.type < len(CLS_DIR3_LIST)):
-		return CLS_DIR3_LIST[chunk.type]
 	return None
 
 def getGUID(chunk):
@@ -297,10 +293,11 @@ def getSuperId(chunk):
 def getClsName(chunk):
 	cls = getClass(chunk)
 	if (cls):
+		clsName = cls.getFirst(0x2042).data
 		try:
-			return "'%s'" %(cls.getFirst(0x2042).data)
+			return "'%s'" %(clsName)
 		except:
-			return "'%s'" %(repr(cls.getFirst(0x2042).data))
+			return "'%r'" %(clsName)
 	return u"%04X" %(chunk.type)
 
 def getReferences(chunk):
@@ -578,7 +575,7 @@ def adjustMaterial(obj, mat):
 			obj.ViewObject.ShapeMaterial.Transparency  = material.get('transparency', 0.0)
 
 def createShape3d(doc, pts, indices,  shape, key, prc, mat):
-	name = shape.getFirst(0x0962).data
+	name = shape.getFirst(TYP_NAME).data
 	cnt = len(pts)
 	if (cnt > 0):
 		if (key is not None): name = "%s_%d" %(name, key)
@@ -713,8 +710,14 @@ def calcPointNi3s(chunk):
 		raise e
 	return list
 
+def createDocObject(doc, name, creator):
+	obj = doc.addObject(creator, getValidName(name))
+	obj.Label = name
+	return obj
+
 def createEditablePoly(doc, shape, msh, mat, mtx):
-	FreeCAD.Console.PrintMessage("building 'Editible Poly' ... ")
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building Editible Poly '%s' ... " %(name))
 	ply = msh.getFirst(0x08FE)
 	indexList   = [] # texture groups
 	coordListI  = [] # texture coordinates
@@ -780,7 +783,8 @@ def getArrayPoint3f(values):
 	return v
 
 def createEditableMesh(doc, shape, msh, mat, mtx):
-	FreeCAD.Console.PrintMessage("building 'Editable Mesh' ... ")
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building Editable Mesh '%s' ... "%(name))
 	ply = msh.getFirst(0x08FE)
 	created = False
 
@@ -810,8 +814,15 @@ def getMtxMshMatLyr(shape):
 			lyr = refs[6]
 	return mtx, msh, mat, lyr
 
+def adjustPlacement(obj, node):
+	mtx = createMatrix(node).flatten()
+	plc = FreeCAD.Placement(FreeCAD.Matrix(*mtx))
+	obj.Placement = plc
+	return plc
+
 def createShell(doc, shape, shell, mat, mtx):
-	FreeCAD.Console.PrintMessage("building 'Shell_%X' ... " %(getGUID(shell)))
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building Shell '%s' ... " %(name))
 	refs = getReferences(shell)
 	msh = refs[-1]
 	created, uid = createMesh(doc, shape, msh, mtx, mat)
@@ -819,110 +830,229 @@ def createShell(doc, shape, shell, mat, mtx):
 		FreeCAD.Console.PrintError("hugh? %016X: %s - " %(uid, getClsName(msh)))
 	return created
 
-def adjustPlacement(obj, node):
-	mtx = createMatrix(node).flatten()
-	obj.Placement = FreeCAD.Placement(FreeCAD.Matrix(*mtx))
-
 def createBox(doc, shape, box, mat, mtx):
-	FreeCAD.Console.PrintMessage("building 'Box' ... ")
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building Box '%s' ... " %(name))
+	obj = createDocObject(doc, name, "Part::Box")
 	pBlock = getReferences(box)[0]
-	# length (float)             [2]
-	# width (float)              [3]
-	# height (float)             [4]
-	# segments length (int)      [5]
-	# segments width (int)       [6]
-	# segments height (int)      [7]
-	# general mapping (bool)     [8]
-	# real world map size (bool) [9]
-	name = shape.getFirst(0x0962).data
-	obj = doc.addObject("Part::Box", getValidName(name))
-	obj.Label = name
-	obj.Length = pBlock.children[2].getFirst(0x0100).data[0]
-	obj.Width = pBlock.children[3].getFirst(0x0100).data[0]
-	obj.Height = pBlock.children[4].getFirst(0x0100).data[0]
-	adjustPlacement(obj, mtx)
+	try:
+		obj.Length = pBlock.children[2].getFirst(0x0100).data[0]
+		obj.Width  = pBlock.children[3].getFirst(0x0100).data[0]
+		h = pBlock.children[4].getFirst(0x0100).data[0]
+	except:
+		obj.Length = UNPACK_BOX_DATA(pBlock.children[1].data)[6]
+		obj.Width  = UNPACK_BOX_DATA(pBlock.children[2].data)[6]
+		h = UNPACK_BOX_DATA(pBlock.children[3].data)[6]
+	if (h < 0):
+		obj.Height = -h
+		plc = adjustPlacement(obj, mtx)
+		try:
+			axis = obj.Shape.Faces[4].Surface.Axis * h
+			obj.Placement = FreeCAD.Placement(plc.Base + axis, plc.Rotation, FreeCAD.Vector(0, 0, 0))
+		except:
+			pass
+	else:
+		obj.Height = h
+		adjustPlacement(obj, mtx)
+	box.geometry = obj
 	return True
 
-def createSphere(doc, shape, cylinder, mat, mtx):
-	FreeCAD.Console.PrintMessage("building 'Sphere' ... ")
-	pBlock = getReferences(cylinder)[0]
-	# radius (float)             [2]
-	# height (float)             [3]
-	# real world map size (bool) [4]
-	# general mapping (bool)     [5]
-	# segments height (int)      [6]
-	# segments cap (int)         [7]
-	# slice (bool)               [8]
-	# sliceFrom (float)          [9]
-	# smoothing (bool)           [A]
-	# sliceTo float)             [B]
-	name = shape.getFirst(0x0962).data
-	obj = doc.addObject("Part::Sphere", getValidName(name))
-	obj.Label = name
-	obj.Radius = pBlock.children[2].getFirst(0x0100).data[0]
+def createSphere(doc, shape, sphere, mat, mtx):
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building Sphere '%s' ... "%(name))
+	obj = createDocObject(doc, name, "Part::Sphere")
+	pBlock = getReferences(sphere)[0]
+	try:
+		obj.Radius = pBlock.children[2].getFirst(0x0100).data[0]
+	except:
+		obj.Radius = UNPACK_BOX_DATA(pBlock.children[1].data)[6]
 	adjustPlacement(obj, mtx)
+	sphere.geometry = obj
 	return True
 
 def createCylinder(doc, shape, cylinder, mat, mtx):
-	FreeCAD.Console.PrintMessage("building 'Cylinder' ... ")
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building Cylinder '%s' ... "%(name))
+	obj = createDocObject(doc, name, "Part::Cylinder")
 	pBlock = getReferences(cylinder)[0]
-	# radius (float)             [2]
-	# height (float)             [3]
-	# real world map size (bool) [4]
-	# general mapping (bool)     [5]
-	# segments height (int)      [6]
-	# segments cap (int)         [7]
-	# slice (bool)               [8]
-	# sliceFrom (float)          [9]
-	# smoothing (bool)           [A]
-	# sliceTo float)             [B]
-	name = shape.getFirst(0x0962).data
-	obj = doc.addObject("Part::Cylinder", getValidName(name))
-	obj.Label = name
-	obj.Radius = pBlock.children[2].getFirst(0x0100).data[0]
-	obj.Height = pBlock.children[3].getFirst(0x0100).data[0]
-	adjustPlacement(obj, mtx)
+	try:
+		r = pBlock.children[2].getFirst(0x0100).data[0]
+		h = pBlock.children[3].getFirst(0x0100).data[0]
+	except:
+		r = UNPACK_BOX_DATA(pBlock.children[1].data)[6]
+		h = UNPACK_BOX_DATA(pBlock.children[2].data)[6]
+
+	if (r < 0):
+		obj.Radius = -r
+	else:
+		obj.Radius = r
+
+	if (h < 0):
+		obj.Height = -h
+		plc = adjustPlacement(obj, mtx)
+		try:
+			axis = obj.Shape.Faces[0].Surface.Axis * h
+			obj.Placement = FreeCAD.Placement(plc.Base + axis, plc.Rotation, FreeCAD.Vector(0, 0, 0))
+		except:
+			pass
+	else:
+		obj.Height = h
+		adjustPlacement(obj, mtx)
+	cylinder.geometry = obj
 	return True
 
-def createChamferBox(doc, shape, box, mat, mtx):
-	FreeCAD.Console.PrintMessage("building 'ChamferBox' ... ")
-	pBlock = getReferences(box)[0]
-	# length (float)             [2]
-	# width (float)              [3]
-	# height (float)             [4]
-	# fillet (float)             [5]
-	# segments length (int)      [6]
-	# segments height (int)      [7]
-	# segments width (int)       [8]
-	# segments fillet (int)      [9]
-	# general mapping (bool)     [A]
-	# real world map size (bool) [B]
-	# smoothing (bool)           [C]
-	name = shape.getFirst(0x0962).data
-	cube = doc.addObject("Part::Box", getValidName(name) + '_b')
-	cube.Label = name + '_b'
-	cube.Length = pBlock.children[2].getFirst(0x0100).data[0]
-	cube.Width = pBlock.children[3].getFirst(0x0100).data[0]
-	cube.Height = pBlock.children[4].getFirst(0x0100).data[0]
-	f = pBlock.children[5].getFirst(0x0100).data[0]
-#	chmfr = doc.addObject("Part::Chamfer", getValidName(name))
-#	adjustPlacement(cube, mtx)
-#	chmfr.Base = cube
-#	myEdges = []
-#	for i in range(12):
-#		myEdges.append(( i+1, fillet, fillet)) # (edge number, chamfer start length, chamfer end length)
-#	chmfr.Edges = myEdges
-#	cube.ViewObject.Visibility = False
+def createTorus(doc, shape, torus, mat, mtx):
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building Torus '%s' ... "%(name))
+	obj = createDocObject(doc, name, 'Part::Torus')
+	pBlock = getReferences(torus)[0]
+	try:
+		obj.Radius1 = pBlock.children[2].getFirst(0x0100).data[0]
+		obj.Radius2 = pBlock.children[3].getFirst(0x0100).data[0]
+	except:
+		obj.Radius1 = UNPACK_BOX_DATA(pBlock.children[1].data)[6]
+		obj.Radius2 = UNPACK_BOX_DATA(pBlock.children[2].data)[6]
+	obj.Angle1  = -180.0
+	obj.Angle2  =  180.0
+	obj.Angle3  =  360.0
+	adjustPlacement(obj, mtx)
+	torus.geometry = obj
+	return True
+
+def createTube(doc, shape, tube, mat, mtx):
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building Tube '%s' ... "%(name))
+	obj = createDocObject(doc, name, 'Part::FeaturePython')
+	Shapes.TubeFeature(obj)
+	vp = ViewProviderShapes.ViewProviderTube(obj.ViewObject)
+	pBlock = getReferences(tube)[0]
+	try:
+		obj.InnerRadius = pBlock.children[2].getFirst(0x0100).data[0]
+		obj.OuterRadius = pBlock.children[3].getFirst(0x0100).data[0]
+		obj.Height      = pBlock.children[4].getFirst(0x0100).data[0]
+	except:
+		obj.InnerRadius = UNPACK_BOX_DATA(pBlock.children[1].data)[6]
+		obj.OuterRadius = UNPACK_BOX_DATA(pBlock.children[2].data)[6]
+		obj.Height      = UNPACK_BOX_DATA(pBlock.children[3].data)[6]
+
+	adjustPlacement(obj, mtx)
+	tube.geometry = obj
+	return True
+
+def createCone(doc, shape, cone, mat, mtx):
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building Cone '%s' ... "%(name))
+	obj = createDocObject(doc, name, 'Part::Cone')
+	pBlock = getReferences(cone)[0]
+	try:
+		obj.Radius2 = pBlock.children[2].getFirst(0x0100).data[0]
+		obj.Radius1 = pBlock.children[3].getFirst(0x0100).data[0]
+		h           = pBlock.children[4].getFirst(0x0100).data[0]
+	except:
+		obj.Radius2 = UNPACK_BOX_DATA(pBlock.children[1].data)[6]
+		obj.Radius1 = UNPACK_BOX_DATA(pBlock.children[2].data)[6]
+		h  = UNPACK_BOX_DATA(pBlock.children[3].data)[6]
+	obj.Angle   = 360.0
+	if (h < 0):
+		obj.Height = -h
+		plc = adjustPlacement(obj, mtx)
+		try:
+			axis = obj.Shape.Faces[1].Surface.Axis * h
+			obj.Placement = FreeCAD.Placement(plc.Base + axis, plc.Rotation, FreeCAD.Vector(0, 0, 0))
+		except:
+			pass
+	else:
+		obj.Height = h
+		adjustPlacement(obj, mtx)
+
+	adjustPlacement(obj, mtx)
+	cone.geometry = obj
+	return True
+
+def createGeoSphere(doc, shape, geo, mat, mtx):
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building GeoSphere '%s' ... "%(name))
+	obj = createDocObject(doc, name, "Part::Sphere")
+	pBlock = getReferences(geo)[0]
+	try:
+		obj.Radius = pBlock.children[4].getFirst(0x0100).data[0]
+	except:
+		obj.Radius = UNPACK_BOX_DATA(pBlock.children[3].data)[6]
+	adjustPlacement(obj, mtx)
+	geo.geometry = obj
+	return True
+
+def createTeapot(doc, shape, teapot, mat, mtx):
+	return createSkippable(doc, shape, teapot, mat, mtx, 'Teapot')
+
+def createPlane(doc, shape, plane, mat, mtx):
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building Plane '%s' ... "%(name))
+	obj = createDocObject(doc, name, 'Part::Plane')
+	pBlock = getReferences(plane)[0]
+	try:
+		obj.Length = pBlock.children[2].getFirst(0x0100).data[0]
+		obj.Width  = pBlock.children[3].getFirst(0x0100).data[0]
+	except:
+		obj.Length = UNPACK_BOX_DATA(pBlock.children[1].data)[6]
+		obj.Width  = UNPACK_BOX_DATA(pBlock.children[2].data)[6]
+
+	adjustPlacement(obj, mtx)
+	plane.geometry = obj
+	return True
+
+def createPyramid(doc, shape, pyramid, mat, mtx):
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building Pyramid '%s' ... "%(name))
+
+	obj = createDocObject(doc, name, "Part::Wedge")
+	pBlock = getReferences(pyramid)[0]
+	try:
+		l = pBlock.children[2].getFirst(0x0100).data[0]
+		w = pBlock.children[3].getFirst(0x0100).data[0]
+		h = pBlock.children[4].getFirst(0x0100).data[0]
+	except:
+		l = UNPACK_BOX_DATA(pBlock.children[1].data)[6]
+		w = UNPACK_BOX_DATA(pBlock.children[2].data)[6]
+		h = UNPACK_BOX_DATA(pBlock.children[3].data)[6]
+
+	obj.Xmin  = 0.0
+	obj.Ymin  = 0.0
+	obj.Zmin  = 0.0
+	obj.X2min = l/2
+	obj.Z2min = w/2
+	obj.Xmax  = l
+	obj.Ymax  = h
+	obj.Zmax  = w
+	obj.X2max = l/2
+	obj.Z2max = w/2
+
+	adjustPlacement(obj, mtx)
+	pyramid.geometry = obj
+	return True
+
+def createProBoolean(doc, shape, pro, mat, mtx):
+	name = shape.getFirst(TYP_NAME).data
+	FreeCAD.Console.PrintMessage("    building ProBoolean '%s' ... " %(name))
+	pBlocks = getReferences(pro)
+	# Types:
+	# 0x12 - 0x2034=[366], 0x2150(0x100, 0x110(0x120, 0x130))), 0x204B='.', 0x100=0x01
+	# 0x11 - 0x2034=[371,375,376], 0x204B '.', 0x7230=0x00000000, 0x7231=0x00000000, 0x2535=0x00000000
+	# 0x13 - 0x2034=[378], 0x2150(0x100, 0x110(0x120, 0x130))), 0x204B='.', 0x100=''
+	# 0x11 - 0x2034=[383,387,388], 0x204B '.', 0x7230=0x00000000, 0x7231=0x00000000, 0x2535=0x00000000
+#	obj = createDocObject(doc, name, "Part::Boolean")
 	return True
 
 def createSkippable(doc, shape, msh, mat, mtx, type):
+	name = shape.getFirst(TYP_NAME).data
 	# skip creating skippable!
-	FreeCAD.Console.PrintMessage("skipping %s ... " % type)
+	FreeCAD.Console.PrintMessage("    skipping %s '%s'... " %(type, name))
 	return True
 
 def createMesh(doc, shape, msh, mtx, mat):
 	created = False
 	uid = getGUID(msh)
+	msh.geometry = None
 	if (uid == 0x0E44F10B3):
 		created = createEditableMesh(doc, shape, msh, mat, mtx)
 	elif (uid == 0x192F60981BF8338D):
@@ -933,12 +1063,26 @@ def createMesh(doc, shape, msh, mtx, mat):
 		created = createSphere(doc, shape, msh, mat, mtx)
 	elif (uid == 0x0000000000000012): # Cylinder
 		created = createCylinder(doc, shape, msh, mat, mtx)
+	elif (uid == 0x0000000000000020): # Torus
+		created = createTorus(doc, shape, msh, mat, mtx)
 	elif (uid == 0x0000000000002032):
 		created = createShell(doc, shape, msh, mat, mtx)
 	elif (uid == 0x0000000000002033):
 		created = createShell(doc, shape, msh, mat, mtx)
-	elif (uid == 0x48EA0F971AD73F40): # ChamferBox
-		created = createChamferBox(doc, shape, msh, mat, mtx)
+	elif (uid == 0x0000000000007B21): # Tube
+		created = createTube(doc, shape, msh, mat, mtx)
+	elif (uid == 0x00000000A86C23DD): # Cone
+		created = createCone(doc, shape, msh, mat, mtx)
+	elif (uid == 0x00007F9E00000000): # GeoSphere
+		created = createGeoSphere(doc, shape, msh, mat, mtx)
+#	elif (uid == 0x2257F99331CEA620): # ProBoolean
+#		created = createProBoolean(doc, shape, msh, mat, mtx)
+	elif (uid == 0x4BF37B1076BF318A): # Pyramid
+		created = createPyramid(doc, shape, msh, mat, mtx)
+	elif (uid == 0x77566f65081f1dfc): #  Plane
+		created = createPlane(doc, shape, msh, mat, mtx)
+	elif (uid == 0xACAD26D9ACAD13D3): # Teapot
+		created = createTeapot(doc, shape, msh, mat, mtx)
 	else:
 		type = SKIPPABLE.get(uid)
 		if (type is not None):
@@ -956,9 +1100,6 @@ def createObject(doc, shape):
 		prnMtx = parent.matrix
 		if (prnMtx): mtx = mtx.dot(prnMtx)
 		parent = getNodeParent(parent)
-
-	FreeCAD.Console.PrintMessage("  found Object '%s'... "%(name))
-	created = False
 
 	created, uid = createMesh(doc, shape, msh, mtx, mat)
 
@@ -994,7 +1135,10 @@ def readScene(doc, ole, fileName):
 
 def read(doc, fileName):
 	if (olefile.isOleFile(fileName)):
+		setEndianess(LITTLE_ENDIAN)
 		ole = olefile.OleFileIO(fileName)
+		p = ole.getproperties('\x05DocumentSummaryInformation', convert_time=True, no_conversion=[10])
+		p = ole.getproperties('\x05SummaryInformation', convert_time=True, no_conversion=[10])
 		if (DEBUG): FreeCAD.Console.PrintMessage("==== ClassData       ===\n")
 		readClassData(ole, fileName)
 		if (DEBUG): FreeCAD.Console.PrintMessage("==== Config          ===\n")

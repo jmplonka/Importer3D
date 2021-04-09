@@ -4,7 +4,7 @@ __title__  = "Collection of 3D Mesh importers"
 __author__ = "Jens M. Plonka"
 __url__    = "https://www.github.com/jmplonka/Importer3D"
 
-import sys, os, FreeCAD, import3DS, importLWO, importMAX, importMB, importGSM
+import os, FreeCAD, import3DS, importLWO, importMAX, importMB, importGSM
 
 def decode(name):
 	"decodes encoded strings"
@@ -59,10 +59,3 @@ def open(filename):
 	FreeCAD.ActiveDocument = doc
 	read(doc, filename)
 	return doc
-
-if (__name__ == '__main__'):
-	# ONLY FOR DEBUGGING PURPOSES
-	if (len(sys.argv) > 1):
-		open(sys.argv[1])
-	else:
-		open(os.path.join(p, '', ''))

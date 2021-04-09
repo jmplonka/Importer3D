@@ -1,3 +1,9 @@
 *.pyc
+/.vs
+/BasicShapes
+/_main.py
 /FreeCAD.py
+/Importer3D.pyproj
+/Importer3D.sln
 /Mesh.py
+/Part.py

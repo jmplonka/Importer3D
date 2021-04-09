@@ -3,8 +3,11 @@
 __title__  = "FreeCAD Maya file importer"
 __author__ = "Jens M. Plonka"
 
-import sys, struct, FreeCAD, numpy, uuid, triangulate
+import sys, FreeCAD, numpy, uuid, triangulate
 from importUtils import newObject
+from struct      import unpack, Struct
+
+UID = Struct('<IHHHHHH').unpack_from
 
 ALIGNMENT = {
 	'FORM': 2, 'CAT ': 2, 'LIST': 2, 'PROP': 2, # => 16Bit
@@ -136,14 +139,14 @@ class ReaderMB():
 
 	def _get(self, fmt, size):
 		end = self.pos + size
-		value, = struct.unpack('>' + fmt, self.data[self.pos:end])
+		value, = unpack('>' + fmt, self.data[self.pos:end])
 		self.pos = end
 		self.update()
 		return value
 
 	def _gets(self, fmt, size, count):
 		end = self.pos + (count * size)
-		values = struct.unpack('>' + fmt*count, self.data[self.pos:end])
+		values = unpack('>' + fmt*count, self.data[self.pos:end])
 		self.pos = end
 		self.update()
 		return values
@@ -180,7 +183,7 @@ class ReaderMB():
 
 	def readUID(self):
 		data = self.data[self.pos:self.pos+16]
-		a = struct.unpack('<IHHHHHH', data)
+		a = UID(data)
 		return "{%08X-%04X-%04X-%04X-%04X%04X%04X}" %(a[0], a[2], a[1], a[4], a[3], a[6], a[5])
 
 	def readString(self, chunk):
