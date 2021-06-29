@@ -5,7 +5,11 @@ __author__ = "Jens M. Plonka"
 __url__    = "https://www.github.com/jmplonka/Importer3D"
 
 import re, Mesh, FreeCAD
-from struct import unpack
+
+from struct     import unpack
+from os.path    import join, dirname, basename
+from sys        import executable
+from subprocess import call
 
 INVALID_NAME = re.compile('^[0-9].*')
 
@@ -28,9 +32,8 @@ def canImport():
 	return _can_import
 
 def missingDependency(module):
-	import subprocess
-
-	subprocess.call(['python', '-m', 'pip', 'install', module])
+	python = join(dirname(executable), basename(executable).replace('FreeCAD', 'python'))
+	call(u"\"%s\" -m pip install \"%s\"" %(python, module))
 	FreeCAD.Console.PrintWarning("DONE!\n")
 	setCanImport(False)
 
