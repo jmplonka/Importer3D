@@ -604,7 +604,7 @@ def createShape3d(doc, pts, indices,  shape, key, prc, mat):
 
 def calcCoordinates(data):
 	l, o = getInt(data, 0)
-	cnt = len(data) / 16
+	cnt = len(data) // 16
 	p = numpy.zeros((cnt, 3), numpy.float32)
 	i = 0
 	while (o < len(data)):
