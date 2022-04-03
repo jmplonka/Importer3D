@@ -4,12 +4,12 @@ __title__  = "FreeCAD Maya file importer"
 __author__ = "Jens M. Plonka"
 
 import sys, shlex, struct, FreeCAD, numpy
-from importUtils import newObject, getShort, getInt
+from importUtils import newObject, getShort, getInt, setEndianess, LITTLE_ENDIAN
 
 class GsmHeader():
 	def __init__(self):
 		self.length     = 0x28
-		self.blockCount = 0
+		self.blocks = []
 
 class GsmMySg():
 	def __init__(self):
@@ -46,9 +46,9 @@ class GsmCsd3(GsmBlock):
 		GsmBlock.__init__(self, data, bHdr)
 		end = bHdr.blockPos + bHdr.blockLength
 		if (data[bHdr.blockPos + 0x10:bHdr.blockPos + 0x13] == '\xEF\xBB\xBF'):
-			self.text = data[bHdr.blockPos + 0x13:end].decode('utf8')
+			self.text = data[bHdr.blockPos + 0x13:end].decode('cp1252')
 		else:
-			self.text = data[bHdr.blockPos + 0x10:end].decode('utf8')
+			self.text = data[bHdr.blockPos + 0x10:end].decode('cp1252')
 
 class GsmCsiu(GsmBlock):
 	def __init__(self, data, bHdr): GsmBlock.__init__(self, data, bHdr)
@@ -125,16 +125,33 @@ class GsmTxtc(GsmBlock):
 
 def readGsmHeader(data):
 	header = GsmHeader()
-	header.blockCount, pos = getInt(data, 0x24)
-	return header, header.length
+	header.magic        = data[0:2]
+	header.version, pos = getShort(data, 2)
+	header.name         = data[pos:pos+0x20]
+	count, pos          = getInt(data, pos + 0x20)
+	header.mySg, pos    = readGsmMySg(data, pos)
+	header.daeH, pos    = readGsmDaeH(data, pos)
+
+	i = 0
+	while i < count:
+		bHdr, pos = readGsmBlockHeader(data, pos)
+		header.blocks.append(bHdr)
+		i += 1
+	return header, pos
 
 def readGsmMySg(data, pos):
 	mySg = GsmMySg()
-	return mySg, pos + mySg.length
+	mySg.key      = data[pos:pos + 0x04].decode('cp1252')
+	mySg.val, pos = getInt(data, pos + 4)
+	return mySg, pos
 
 def readGsmDaeH(data, pos):
 	daeH = GsmDaeH()
-	return daeH, pos + daeH.length
+	daeH.key         = data[pos:pos + 0x04].decode('cp1252')
+	daeH.offset, pos = getInt(data, pos + 4)
+	daeH.length, pos = getInt(data, pos)
+	daeH.data        = data[pos:pos+0x44]
+	return daeH, pos + 0x44
 
 def readGsmBlockHeader(data, pos):
 	bHdr = GsmBlockHeader()
@@ -422,17 +439,13 @@ class GsmReader():
 
 def read(doc, fileName):
 	with open(fileName, 'rb') as file:
+		setEndianess(LITTLE_ENDIAN)
 		data = file.read()
 		hdr, pos  = readGsmHeader(data)
-		mySg, pos = readGsmMySg(data, pos)
-		daeH, pos = readGsmDaeH(data, pos)
 		blocks = {}
-		i = hdr.blockCount
-		while (i > 0):
-			bHdr, pos  = readGsmBlockHeader(data, pos)
+		for bHdr in hdr.blocks:
 			block = readGsmBlock(data, bHdr)
 			blocks[bHdr.key] = block
-			i -= 1
 		reader = GsmReader()
 		reader.read(doc, blocks.get('CSD3'))
 
