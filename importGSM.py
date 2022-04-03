@@ -5,6 +5,7 @@ __author__ = "Jens M. Plonka"
 
 import sys, shlex, struct, FreeCAD, numpy
 from importUtils import newObject, getShort, getInt, setEndianess, LITTLE_ENDIAN
+from FreeCAD import Console
 
 class GsmHeader():
 	def __init__(self):
@@ -45,8 +46,8 @@ class GsmCsd3(GsmBlock):
 	def __init__(self, data, bHdr):
 		GsmBlock.__init__(self, data, bHdr)
 		end = bHdr.blockPos + bHdr.blockLength
-		if (data[bHdr.blockPos + 0x10:bHdr.blockPos + 0x13] == '\xEF\xBB\xBF'):
-			self.text = data[bHdr.blockPos + 0x13:end].decode('cp1252')
+		if (data[bHdr.blockPos + 0x10:bHdr.blockPos + 0x13] == b'\xEF\xBB\xBF'):
+			self.text = data[bHdr.blockPos + 0x13:end].decode('utf8')
 		else:
 			self.text = data[bHdr.blockPos + 0x10:end].decode('cp1252')
 
@@ -392,6 +393,10 @@ class GsmReader():
 					tok = st.get_token() # skip ':'
 					self.currentName = st.get_token()
 
+	def readCPrism(self, st):
+		Console.PrintError("ERROR: Reading C-Prism's not yet implemented")
+		return
+
 	def read(self, doc, csd3):
 		self.materials = {}
 		self.vertexList = []
@@ -420,6 +425,25 @@ class GsmReader():
 				elif (tok == 'IF'):        pass
 				elif (tok == 'material'):  self.readMaterial(st)
 				elif (tok == 'min'):       pass
+				elif (tok == 'rotx'):      pass # rotation x-axis in degree
+				elif (tok == 'roty'):      pass # rotation y-axis in degree
+				elif (tok == 'rotz'):      pass # rotation z-axis in degree
+				elif (tok == 'ROTX'):      pass # rotation x-axis in degree
+				elif (tok == 'ROTY'):      pass # rotation y-axis in degree
+				elif (tok == 'ROTZ'):      pass # rotation z-axis in degree
+				elif (tok == 'MULX'):      pass # scale x-axis A / value
+				elif (tok == 'MULY'):      pass # scale y-axis B / value
+				elif (tok == 'MULZ'):      pass # scale z-axis C / value
+				elif (tok == 'ADDX'):      pass # move in x-axis direction
+				elif (tok == 'ADDY'):      pass # move in y-axis direction
+				elif (tok == 'ADDZ'):      pass # move in z-axis direction
+				elif (tok == 'RESOL'):     pass # resolution value
+				elif (tok == 'GLOB_HSTORY_HEIGHT'):     pass # ???
+				elif (tok == 'GLOB_LAYER'): pass # name of the layer
+				elif (tok == 'GLOB_ID'):    pass # id of the object
+				elif (tok == 'GLOB_INTID'): pass # 
+				elif (tok == 'cPRISM_'):   self.readCPrism(st) 
+
 				elif (tok == 'MODEL'):     self.readModel(st)
 				elif (tok == 'MUL'):       self.resetMaterial()
 				elif (tok == 'PEN'):       self.resetMaterial()
@@ -432,7 +456,7 @@ class GsmReader():
 						st.push_token(tok)
 						self.readDefine(st)
 					else:
-						raise Exception("Unrecognized token '%s' (mat_block=%d)" %(tok, self.mat_block))
+						Console.PrintError("ERROR: Unrecognized token '%s' (mat_block=%d)" %(tok, self.mat_block))
 		except:
 			pass
 		progressbar.stop()
