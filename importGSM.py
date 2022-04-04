@@ -3,9 +3,10 @@
 __title__  = "FreeCAD Maya file importer"
 __author__ = "Jens M. Plonka"
 
-import sys, shlex, struct, FreeCAD, numpy
-from importUtils import newObject, getShort, getInt, setEndianess, LITTLE_ENDIAN
-from FreeCAD import Console
+import sys, shlex, struct, FreeCAD, numpy, traceback
+from importUtils import newObject, getShort, getInt, setEndianess, LITTLE_ENDIAN, CENTER, DIR_Z, getValidName
+from FreeCAD     import Console, Vector as VEC
+from Part        import makePolygon, Face, show
 
 class GsmHeader():
 	def __init__(self):
@@ -99,7 +100,7 @@ class GsmDrapInfo():
 
 class GsmDrap(GsmBlock):
 	def __init__(self, data, bHdr):
-		GsmBlock.__init__(self, id, l)
+		GsmBlock.__init__(self, data, bHdr)
 		self.count, self.pos = getShort(data, bHdr.blockPos + 0x32)
 		self.infos = {}
 		self.pos = bHdr.blockPos + 0x80
@@ -113,16 +114,22 @@ class GsmDrap(GsmBlock):
 		self.strings = txt.split('\0')
 
 class GsmFfig(GsmBlock):
-	def __init__(self, data, bHdr): GsmBlock.__init__(self, id, l)
+	def __init__(self, data, bHdr):
+		GsmBlock.__init__(self, data, bHdr)
+		pos = bHdr.blockPos + 4
+		end = pos + 4 + bHdr.length
+		self.data = data[pos:end]
+#		with open('C:/workspace/tumbnail.png', 'wb') as f:
+#			f.write(data)
 
 class GsmScna(GsmBlock):
-	def __init__(self, data, bHdr): GsmBlock.__init__(self, id, l)
+	def __init__(self, data, bHdr): GsmBlock.__init__(self, data, bHdr)
 
 class GsmSrcm(GsmBlock):
-	def __init__(self, data, bHdr): GsmBlock.__init__(self, id, l)
+	def __init__(self, data, bHdr): GsmBlock.__init__(self, data, bHdr)
 
 class GsmTxtc(GsmBlock):
-	def __init__(self, data, bHdr): GsmBlock.__init__(self, id, l)
+	def __init__(self, data, bHdr): GsmBlock.__init__(self, data, bHdr)
 
 def readGsmHeader(data):
 	header = GsmHeader()
@@ -271,7 +278,6 @@ class GsmReader():
 			mesh = newObject(doc, self.currentName, data)
 			self.adjustMaterial(mesh)
 
-
 	def readDefine(self, st):
 		# DEFINE MATERIAL "name" 0,
 		# 0.713726, 0.482353, 0.403922, !surface RGB [0.0..1.0]x3
@@ -393,9 +399,34 @@ class GsmReader():
 					tok = st.get_token() # skip ':'
 					self.currentName = st.get_token()
 
-	def readCPrism(self, st):
-		Console.PrintError("ERROR: Reading C-Prism's not yet implemented")
-		return
+	def readCPrism(self, doc, lines, i, name):
+		# colmat, colmat, colmat,
+		i += 1
+		line = lines[i].strip()
+		# n, h,
+		values = line.split(',')
+		n = int(values[0].strip())
+		h = float(values[1].strip())
+		wires = []
+		points = []
+		while (line[-1] == ','):
+			i += 1
+			line = lines[i].strip()
+			# n * (x_i, y_i, s_i)
+			values = line.split(',')
+			x = float(values[0].strip())
+			y = float(values[1].strip())
+			s = int(values[2].strip())
+			points.append(VEC(x, y, 0))
+			if (s == -1):
+				wire = makePolygon(points)
+				wires.append(wire)
+				points.clear()
+		face = Face(wires)
+		prism = doc.addObject("Part::Feature", getValidName(name))
+		prism.Label = name
+		prism.Shape = face.extrude(h * DIR_Z)
+		return line, i
 
 	def read(self, doc, csd3):
 		self.materials = {}
@@ -406,59 +437,87 @@ class GsmReader():
 		lines = csd3.text.splitlines()
 		progressbar = FreeCAD.Base.ProgressIndicator()
 		progressbar.start("  reading ...", len(lines))
+		glob_layer = ''
+		glob_id    = ''
+		glob_intid = ''
+		name = 'object'
 		try:
-			for line in lines:
-				progressbar.next()
-				st = shlex.shlex(line.strip())
-				st.wordchars += '.-'
-				st.whitespace += ','
-				tok = st.get_token()
-				if (tok == ''): pass
-				elif (tok == 'BASE'):      self.readBase(st)
-				elif (tok == 'BODY'):      self.readBody(st, doc)
-				elif (tok == 'COOR'):      self.resetMaterial()
-				elif (tok == 'DEFINE'):    self.readDefine(st)
-				elif (tok == 'EDGE'):      self.readEdge(st)
-				elif (tok == 'ELSE'):      self.resetMaterial()
-				elif (tok == 'ENDIF'):     self.resetMaterial()
-				elif (tok == 'hotspot'):   self.resetMaterial()
-				elif (tok == 'IF'):        pass
-				elif (tok == 'material'):  self.readMaterial(st)
-				elif (tok == 'min'):       pass
-				elif (tok == 'rotx'):      pass # rotation x-axis in degree
-				elif (tok == 'roty'):      pass # rotation y-axis in degree
-				elif (tok == 'rotz'):      pass # rotation z-axis in degree
-				elif (tok == 'ROTX'):      pass # rotation x-axis in degree
-				elif (tok == 'ROTY'):      pass # rotation y-axis in degree
-				elif (tok == 'ROTZ'):      pass # rotation z-axis in degree
-				elif (tok == 'MULX'):      pass # scale x-axis A / value
-				elif (tok == 'MULY'):      pass # scale y-axis B / value
-				elif (tok == 'MULZ'):      pass # scale z-axis C / value
-				elif (tok == 'ADDX'):      pass # move in x-axis direction
-				elif (tok == 'ADDY'):      pass # move in y-axis direction
-				elif (tok == 'ADDZ'):      pass # move in z-axis direction
-				elif (tok == 'RESOL'):     pass # resolution value
-				elif (tok == 'GLOB_HSTORY_HEIGHT'):     pass # ???
-				elif (tok == 'GLOB_LAYER'): pass # name of the layer
-				elif (tok == 'GLOB_ID'):    pass # id of the object
-				elif (tok == 'GLOB_INTID'): pass # 
-				elif (tok == 'cPRISM_'):   self.readCPrism(st) 
-
-				elif (tok == 'MODEL'):     self.readModel(st)
-				elif (tok == 'MUL'):       self.resetMaterial()
-				elif (tok == 'PEN'):       self.resetMaterial()
-				elif (tok == 'PGON'):      self.readPolygon(st)
-				elif (tok == 'TEVE'):      self.readTextureVertex(st)
-				elif (tok == 'VERT'):      self.readVertex(st)
-				elif (tok == '!'):         self.readComment(st)
-				else:
-					if (self.mat_block != 0):
-						st.push_token(tok)
-						self.readDefine(st)
+			skip = False
+			i = 0
+			while (i < len(lines)):
+				line = lines[i]
+				if (not skip):
+					progressbar.next()
+					st = shlex.shlex(line.strip())
+					st.wordchars += '.-'
+					st.whitespace += ','
+					tok = st.get_token()
+					if (tok == ''): pass
+					elif (tok == 'BASE'):      self.readBase(st)
+					elif (tok == 'BODY'):      self.readBody(st, doc)
+					elif (tok == 'COOR'):      self.resetMaterial()
+					elif (tok == 'DEFINE'):    self.readDefine(st)
+					elif (tok == 'EDGE'):      self.readEdge(st)
+					elif (tok == 'ELSE'):      self.resetMaterial()
+					elif (tok == 'ENDIF'):     self.resetMaterial()
+					elif (tok == 'hotspot'):   self.resetMaterial()
+					elif (tok == 'IF'):        pass
+					elif (tok == 'material'):  self.readMaterial(st)
+					elif (tok == 'DEL'):       pass # ???
+					elif (tok == 'min'):       pass
+					elif (tok == 'rotx'):      pass # rotation x-axis in degree
+					elif (tok == 'roty'):      pass # rotation y-axis in degree
+					elif (tok == 'rotz'):      pass # rotation z-axis in degree
+					elif (tok == 'ROTX'):      pass # rotation x-axis in degree
+					elif (tok == 'ROTY'):      pass # rotation y-axis in degree
+					elif (tok == 'ROTZ'):      pass # rotation z-axis in degree
+					elif (tok == 'MULX'):      pass # scale x-axis A / value
+					elif (tok == 'MULY'):      pass # scale y-axis B / value
+					elif (tok == 'MULZ'):      pass # scale z-axis C / value
+					elif (tok == 'ADDX'):      pass # move in x-axis direction
+					elif (tok == 'ADDY'):      pass # move in y-axis direction
+					elif (tok == 'ADDZ'):      pass # move in z-axis direction
+					elif (tok == 'RESOL'):     pass # resolution value
+					elif (tok == 'GLOB_HSTORY_HEIGHT'): pass # ???
+					elif (tok == 'GLOB_LAYER'):
+						dummy = st.get_token()
+						glob_layer = st.get_token() # name of the layer
+						glob_layer = glob_layer[1:-1]
+					elif (tok == 'GLOB_ID'):
+						dummy = st.get_token()
+						glob_id = st.get_token() # id of the object
+						glob_id = glob_id[1:-1]
+					elif (tok == 'GLOB_INTID'):
+						dummy = st.get_token()
+						glob_intid = st.get_token() #
+						glob_intid = glob_intid[1:-1]
+					elif (tok == 'cPRISM_'):   line, i = self.readCPrism(doc, lines, i, name)
+					elif (tok == 'MODEL'):     self.readModel(st)
+					elif (tok == 'MUL'):       self.resetMaterial()
+					elif (tok == 'PEN'):       self.resetMaterial()
+					elif (tok == 'PGON'):      self.readPolygon(st)
+					elif (tok == 'TEVE'):      self.readTextureVertex(st)
+					elif (tok == 'VERT'):      self.readVertex(st)
+					elif (tok == '!'):         self.readComment(st)
 					else:
-						Console.PrintError("ERROR: Unrecognized token '%s' (mat_block=%d)" %(tok, self.mat_block))
-		except:
-			pass
+						if (self.mat_block != 0):
+							st.push_token(tok)
+							self.readDefine(st)
+						else:
+							Console.PrintError("ERROR: Unrecognized token '%s' (mat_block=%d)\n" %(tok, self.mat_block))
+					if (glob_layer):
+						name = glob_layer
+					if (glob_id):
+						name = '%s_%s' %(name, glob_id)
+					if (glob_intid):
+						name = '%s_%s' %(name, glob_intid)
+				try:
+					skip = line[-1] == ','
+				except:
+					skip = False
+				i += 1
+		except Exception as e:
+			Console.PrintError(traceback.format_exc())
 		progressbar.stop()
 
 def read(doc, fileName):
@@ -472,11 +531,3 @@ def read(doc, fileName):
 			blocks[bHdr.key] = block
 		reader = GsmReader()
 		reader.read(doc, blocks.get('CSD3'))
-
-if __name__ == '__main__':
-	if (len(sys.argv) > 1):
-		print(sys.argv[1])
-		read(FreeCAD.ActiveDocument, sys.argv[1])
-	else:
-		read(FreeCAD.ActiveDocument, u"D:/documents/NOTE/3d/ArmChair/Armchair fotel b6500.gsm")
-		#read(FreeCAD.ActiveDocument, u"D:/documents/NOTE/3d/motorristja.gsm")

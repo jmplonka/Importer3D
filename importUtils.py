@@ -18,6 +18,11 @@ BIG_ENDIAN = '>'
 LITTLE_ENDIAN = '<'
 ENDIANNESS = BIG_ENDIAN
 
+CENTER = FreeCAD.Vector(0.0, 0.0, 0.0)
+DIR_X  = FreeCAD.Vector(1.0, 0.0, 0.0)
+DIR_Y  = FreeCAD.Vector(0.0, 1.0, 0.0)
+DIR_Z  = FreeCAD.Vector(0.0, 0.0, 1.0)
+
 def setEndianess(endianess):
 	global ENDIANNESS
 	ENDIANNESS = endianess
